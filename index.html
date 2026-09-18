@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>แชร์ค่าใช้จ่าย - Ultimate Master Edition</title>
+<title>แชร์ค่าใช้จ่าย - Ultimate Master Pro Max</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -36,6 +36,9 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .btn-icon { width: 42px; height: 42px; border-radius: 14px; background: var(--bg); border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light); display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .btn-icon:active { box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
 
+/* Due Alert Banner */
+.due-alert-banner { background: #ffebeb; border: 1px dashed var(--danger); border-radius: 14px; padding: 10px 14px; margin-bottom: 16px; font-size: 12.5px; color: var(--danger); display: flex; align-items: center; gap: 8px; }
+
 /* Balance Card & Budget */
 .balance-card { 
   background: linear-gradient(135deg, var(--primary-light), var(--primary));
@@ -44,8 +47,12 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 }
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
-.split-badges { display: flex; gap: 8px; margin-bottom: 12px; }
-.split-badge { background: rgba(255,255,255,0.2); padding: 8px 10px; border-radius: 12px; flex: 1; backdrop-filter: blur(4px); cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+
+/* Horizontal Scrollable Split Badges (แก้ปัญหาตกขอบ) */
+.split-badges-container { width: 100%; overflow-x: auto; white-space: nowrap; margin-bottom: 12px; padding-bottom: 4px; }
+.split-badges-container::-webkit-scrollbar { display: none; }
+.split-badges { display: inline-flex; gap: 8px; }
+.split-badge { background: rgba(255,255,255,0.2); padding: 8px 14px; border-radius: 12px; min-width: 110px; backdrop-filter: blur(4px); cursor: pointer; transition: 0.2s; border: 1px solid transparent; display: inline-block; vertical-align: top; }
 .split-badge:hover { background: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5); }
 .split-badge span { display: block; font-size: 11px; opacity: 0.9; }
 .split-badge strong { display: block; font-size: 14px; margin-top: 2px; }
@@ -141,7 +148,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #a0b2a7; cursor: pointer; padding: 6px 14px; transition: 0.3s; }
 .nav-item i { font-size: 18px; font-style: normal; }
 .nav-item span { font-size: 9.5px; font-weight: 600; }
-.nav-item.active { color: var(--primary-dark); }
+.nav-item.active { color: var(--text-main); }
 .nav-fab {
   width: 52px; height: 52px; border-radius: 50%; background: var(--primary);
   display: flex; align-items: center; justify-content: center; color: #fff; font-size: 24px;
@@ -176,16 +183,23 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   <div id="view-home">
     <div class="header-top">
       <div>
-        <p>Ultimate Master Edition</p>
+        <p>Ultimate Master Pro Max</p>
         <h1>แชร์ค่าใช้จ่าย</h1>
       </div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
 
+    <!-- Due Alert Banner -->
+    <div id="dueAlertBanner" class="hidden"></div>
+
     <div class="balance-card">
       <p>ยอดค้างรอบบิลนี้ (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
-      <div class="split-badges" id="personSummary"></div>
+      
+      <!-- Horizontal Scrollable Split Badges (รองรับไม่จำกัดคน ไม่ตกขอบ) -->
+      <div class="split-badges-container">
+        <div class="split-badges" id="personSummary"></div>
+      </div>
       
       <!-- Quick Breakdown Button -->
       <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
@@ -278,7 +292,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
         <option value="ช้อปออนไลน์/Shopee">ช้อปออนไลน์ / Shopee / Lazada</option>
         <option value="อาหาร/เครื่องดื่ม">อาหาร / เครื่องดื่ม</option>
         <option value="เดินทาง/น้ำมัน">เดินทาง / น้ำมัน</option>
-        <option value="บิล/สาธารณูปโภค">บิล / สาธารณูปโภค</option>
+        <option value="บิล/สาธารณูปโภค">บิล / สาธารณูปโภค (ค่าน้ำ, ค่าไฟ, อินเทอร์เน็ต)</option>
         <option value="อื่นๆ">อื่นๆ</option>
       </select>
     </div>
@@ -311,7 +325,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
-<!-- Modal: สรุปยอดหนี้แยกตามช่องทาง (Payment Method Breakdown) -->
+<!-- Modal: สรุปยอดหนี้แยกตามช่องทาง -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -439,17 +453,24 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: Settings -->
+<!-- Modal: Settings (ตั้งค่าวันตัดรอบ และวันครบกำหนดชำระแต่ละช่องทาง) -->
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="sheet">
     <div class="grabber"></div>
-    <h3 style="margin:0 0 20px; font-size:20px; text-align:center">ตั้งค่าระบบ</h3>
+    <h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่าวันตัดรอบบิล & วันครบกำหนด</h3>
+    
     <div class="input-group">
       <label>วันตัดรอบบิล (วันที่ 1 - 28)</label>
       <input id="cutoffInput" type="number" min="1" max="28">
     </div>
-    <p style="font-size:12px; color:var(--text-muted); margin:-10px 0 24px;">ค่านี้จะบันทึกเฉพาะในเครื่องของคุณ</p>
-    <button class="btn-main" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+
+    <h4 style="font-size:14px; margin:15px 0 8px; color:var(--primary-dark)">📅 วันครบกำหนดจ่ายของแต่ละช่องทาง (วันของเดือน)</h4>
+    <div class="input-group"><label>Credit Card (บัตรเครดิต)</label><input id="dueCC" type="number" min="1" max="31" placeholder="เช่น 30"></div>
+    <div class="input-group"><label>SPayLater / ShopeePay</label><input id="dueShopee" type="number" min="1" max="31" placeholder="เช่น 5"></div>
+    <div class="input-group"><label>Lazada / LazPayLater</label><input id="dueLazada" type="number" min="1" max="31" placeholder="เช่น 20"></div>
+    <div class="input-group"><label>บิลสาธารณูปโภค (ค่าน้ำ/ค่าไฟ)</label><input id="dueUtility" type="number" min="1" max="31" placeholder="เช่น 15"></div>
+
+    <button class="btn-main" style="margin-top:10px;" onclick="saveSettings()">บันทึกการตั้งค่า</button>
   </div>
 </div>
 
@@ -476,8 +497,13 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); }
 catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
 
 let entries = [];
-let localSettings = JSON.parse(localStorage.getItem("pro-master-settings")) || { cutoffDay: 17, budgets: {} };
+let localSettings = JSON.parse(localStorage.getItem("pro-master-settings")) || { 
+  cutoffDay: 17, 
+  budgets: {},
+  dueDates: { "CreditCard": 30, "SPayLater": 5, "Lazada": 20, "บิล/สาธารณูปโภค": 15 }
+};
 if(!localSettings.budgets) localSettings.budgets = {};
+if(!localSettings.dueDates) localSettings.dueDates = { "CreditCard": 30, "SPayLater": 5, "Lazada": 20, "บิล/สาธารณูปโภค": 15 };
 
 // --- Utilities ---
 function saveSettingsLocal(){ localStorage.setItem("pro-master-settings", JSON.stringify(localSettings)); }
@@ -635,13 +661,12 @@ async function addEntry(){
 function setupLongPress(element, id) {
   let timer = null;
   const startPress = (e) => {
-    // ถ้ากดที่ปุ่มลิงก์หรือรูปภาพ ไม่ต้องนับ long press
     if(e.target.tagName === 'IMG' || e.target.tagName === 'SPAN' || e.target.tagName === 'P') return;
     timer = setTimeout(() => {
       if(confirm("⚠️ คุณต้องการลบรายการนี้ใช่หรือไม่?")) {
         db.collection("entries").doc(id).delete();
       }
-    }, 800); // กดค้าง 0.8 วินาที
+    }, 800);
   };
   const cancelPress = () => { if(timer) clearTimeout(timer); };
   
@@ -852,7 +877,31 @@ function saveBudgetGoal() {
   render();
 }
 
-// --- Modal: สรุปยอดหนี้แยกตามช่องทาง (Payment Breakdown) ---
+// --- Check Due Dates & Alerts ---
+function checkDueAlerts(currentCycleKey) {
+  const banner = document.getElementById("dueAlertBanner");
+  const dueDates = localSettings.dueDates || {};
+  const today = new Date();
+  const currentDay = today.getDate();
+  
+  let alerts = [];
+  for(let method in dueDates) {
+    let dueDay = Number(dueDates[method]);
+    let diff = dueDay - currentDay;
+    if(diff >= 0 && diff <= 3) {
+      alerts.push(`⚠️ ช่องทาง <b>${method}</b> มีกำหนดชำระในวันที่ ${dueDay} นี้แล้ว (เหลืออีก ${diff} วัน)`);
+    }
+  }
+
+  if(alerts.length > 0) {
+    banner.innerHTML = `<div>🔔 <strong>แจ้งเตือนกำหนดจ่าย:</strong><br>${alerts.join("<br>")}</div>`;
+    banner.classList.remove("hidden");
+  } else {
+    banner.classList.add("hidden");
+  }
+}
+
+// --- Modal: สรุปยอดหนี้แยกตามช่องทาง ---
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("methodModalCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
@@ -865,6 +914,7 @@ function openMethodBreakdownModal() {
   });
 
   let breakdown = {};
+  const dueDates = localSettings.dueDates || {};
 
   es.forEach(x => {
     const eff = getEffectiveItemData(x, k);
@@ -880,9 +930,13 @@ function openMethodBreakdownModal() {
   } else {
     for(let method in breakdown) {
       let dat = breakdown[method];
+      let dueDay = dueDates[method] ? ` (กำหนดจ่ายวันที่ ${dueDates[method]})` : '';
       html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--shadow-dark); padding-bottom:6px;">
-          <strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)}</strong>
+          <div>
+            <strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)}</strong>
+            <div style="font-size:11px; color:var(--text-muted);">${dueDay}</div>
+          </div>
           <strong style="font-size:15px; color:var(--text-main)">฿${money(dat.total)}</strong>
         </div>
         <div style="font-size:12.5px;">`;
@@ -967,6 +1021,8 @@ function render(){
     document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   }
 
+  checkDueAlerts(k);
+
   const es = entries.filter(x => {
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       return x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
@@ -1047,7 +1103,6 @@ function render(){
     </div>`;
   }).join("") : `<div style="text-align:center; padding: 40px 20px; color: var(--text-muted); font-size:13.5px">ยังไม่มีรายการค่าใช้จ่ายในรอบบิลนี้<br><br>กดปุ่ม + ด้านล่างเพื่อเริ่มบันทึกเลย! 🌿</div>`;
 
-  // ผูกฟังก์ชันกดค้างเพื่อลบกับการ์ดแต่ละใบ
   es.forEach(x => {
     const cardEl = document.getElementById(`card-${x.id}`);
     if(cardEl) setupLongPress(cardEl, x.id);
@@ -1187,9 +1242,34 @@ function exportStyledHTML() {
 }
 
 // --- Setting Modal ---
-function openSettings(){ document.getElementById("cutoffInput").value = localSettings.cutoffDay; document.getElementById("settingsModal").classList.add("open"); }
+function openSettings(){ 
+  document.getElementById("cutoffInput").value = localSettings.cutoffDay; 
+  document.getElementById("dueCC").value = localSettings.dueDates["CreditCard"] || "";
+  document.getElementById("dueShopee").value = localSettings.dueDates["SPayLater"] || "";
+  document.getElementById("dueLazada").value = localSettings.dueDates["Lazada"] || "";
+  document.getElementById("dueUtility").value = localSettings.dueDates["บิล/สาธารณูปโภค"] || "";
+  document.getElementById("settingsModal").classList.add("open"); 
+}
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
-function saveSettings(){ let c = Number(document.getElementById("cutoffInput").value); if(c<1||c>28){alert("ระบุ 1-28");return;} localSettings.cutoffDay = c; saveSettingsLocal(); closeSettings(); refreshCycles(); render(); }
+function saveSettings(){ 
+  let c = Number(document.getElementById("cutoffInput").value); 
+  if(c<1||c>28){alert("ระบุวันตัดรอบบิลระหว่าง 1-28");return;} 
+  localSettings.cutoffDay = c;
+  
+  localSettings.dueDates = {
+    "CreditCard": Number(document.getElementById("dueCC").value) || 30,
+    "SPayLater": Number(document.getElementById("dueShopee").value) || 5,
+    "Lazada": Number(document.getElementById("dueLazada").value) || 20,
+    "บิล/สาธารณูปโภค": Number(document.getElementById("dueUtility").value) || 15
+  };
+
+  saveSettingsLocal(); 
+  closeSettings(); 
+  refreshCycles(); 
+  render(); 
+  alert("บันทึกการตั้งค่าสำเร็จ!");
+}
+
 function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
 
 function setup(){
