@@ -229,9 +229,9 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
         <div class="icon">🎯</div>
         <span>ตั้งงบ</span>
       </div>
-      <div class="action-btn" onclick="exportStyledHTML()">
+      <div class="action-btn" onclick="exportStyledCSV()">
         <div class="icon">📊</div>
-        <span>ชีทสวย</span>
+        <span>ชีท CSV</span>
       </div>
       <div class="action-btn" onclick="openVisualReport()">
         <div class="icon">🖼️</div>
@@ -490,7 +490,6 @@ catch (err) { alert("ระบบฐานข้อมูลขัดข้อ�
 let entries = [];
 let userChangedCycle = false;
 
-// ค่าตั้งต้นรอบบิลและวันกำหนดจ่ายแยกรายช่องทาง
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || {
   budgets: {},
   channels: {
@@ -587,7 +586,6 @@ function keyFromDateForMethod(dateStr, method) {
   return `${n.getFullYear()}-${pad(n.getMonth()+1)}`;
 }
 
-// สำหรับรอบบิลภาพรวมหน้าแรก อิงจากบัตรเครดิตหลักหรือวันที่เลือก
 function keyFromDate(s){
   return keyFromDateForMethod(s, "CreditCard");
 }
@@ -930,7 +928,7 @@ function checkDueAlerts(currentCycleKey) {
   }
 }
 
-// --- Modal: สรุปยอดหนี้แยกตามช่องทาง (อิงรอบบิลเฉพาะตัวของแต่ละช่องทาง) ---
+// --- Modal: สรุปยอดหนี้แยกตามช่องทาง ---
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("methodModalCycleLabel").textContent = `อิงรอบบิลหลัก: ${cycleLabel(k)}`;
@@ -942,7 +940,6 @@ function openMethodBreakdownModal() {
     let m = x.method || "CreditCard";
     let chCycleKey = keyFromDateForMethod(x.date, m);
     
-    // ตรวจสอบว่าตรงกับรอบบิลที่เลือกดูอยู่หรือไม่
     let matchCycle = false;
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
@@ -990,7 +987,7 @@ function openMethodBreakdownModal() {
 }
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล (แยกตามช่องทางจ่าย พร้อมรูปภาพ) ---
+// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล ---
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`;
@@ -1241,8 +1238,8 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์สวยหรูโทนพลาสเทล พร้อมหัวข้อและ Filter ---
-function exportStyledHTML() {
+// --- ส่งออกไฟล์ CSV รองรับทั้ง PC และ Mobile พร้อมรายละเอียดผ่อนและดอกเบี้ย ---
+function exportStyledCSV() {
   if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
   const es = entries.filter(x => {
@@ -1250,61 +1247,42 @@ function exportStyledHTML() {
     return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : keyFromDateForMethod(x.date, m) === k;
   }).sort((a,b)=>a.date.localeCompare(b.date));
   
-  let rowsHtml = "";
+  let csvRows = [];
+  // Header
+  csvRows.push(["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"].map(field => `"${field}"`).join(","));
+
   es.forEach(x => {
     const eff = getEffectiveItemData(x, k);
-    rowsHtml += `<tr>
-      <td>${fmtDate(x.date)}</td>
-      <td><strong>${esc(x.item)}</strong></td>
-      <td>${esc(x.owner)}</td>
-      <td>${esc(x.method)}</td>
-      <td>${esc(x.category)}</td>
-      <td style="text-align:right;">${Number(eff.amount).toFixed(2)}</td>
-      <td style="text-align:right; color:#5e8469;">${Number(eff.repaid).toFixed(2)}</td>
-      <td style="text-align:right; color:#e26d6d;">${Number(eff.remain).toFixed(2)}</td>
-      <td>${esc(x.note)}</td>
-    </tr>`;
+    let itemName = x.item;
+
+    // ถ้าเป็นรายการผ่อนชำระ ให้เพิ่มรายละเอียดงวดและดอกเบี้ยต่อท้ายชื่อรายการ
+    if (x.isInstallment && x.installmentPlan) {
+      let m = x.method || "CreditCard";
+      let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k);
+      let periodNo = matchedS ? matchedS.no : 1;
+      let totalMonths = x.installmentPlan.months;
+      let interestRate = x.installmentPlan.annualInterest || 0;
+      itemName += ` [ผ่อนชำระ งวดที่ ${periodNo}/${totalMonths} | ดอกเบี้ย ${interestRate}% ต่อปี]`;
+    }
+
+    let row = [
+      fmtDate(x.date),
+      itemName,
+      x.owner,
+      x.method,
+      x.category,
+      Number(eff.amount).toFixed(2),
+      Number(eff.repaid).toFixed(2),
+      Number(eff.remain).toFixed(2),
+      x.note || ""
+    ];
+
+    csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
   });
 
-  const htmlDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-  <head>
-    <meta charset="UTF-8">
-    <style>
-      body { font-family: 'Prompt', sans-serif; background-color: #f2f6f4; padding: 20px; }
-      .header-title { font-size: 20px; font-weight: bold; color: #233128; margin-bottom: 5px; }
-      .sub-title { font-size: 13px; color: #7a9082; margin-bottom: 20px; }
-      table { border-collapse: collapse; width: 100%; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-      th { background-color: #9bc2a6; color: #ffffff; padding: 12px 10px; font-size: 13px; text-align: left; border: 1px solid #d5e2da; }
-      td { padding: 10px; font-size: 12.5px; color: #233128; border: 1px solid #d5e2da; }
-      tr:nth-child(even) { background-color: #f9fbf9; }
-    </style>
-  </head>
-  <body>
-    <div class="header-title">📊 รายงานสรุปค่าใช้จ่ายประจำรอบบิล</div>
-    <div class="sub-title">รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ CC & Loan Master</div>
-    <table>
-      <thead>
-        <tr style="text-align:center;">
-          <th>วันที่</th>
-          <th>รายการ</th>
-          <th>ผู้จ่าย</th>
-          <th>ช่องทาง</th>
-          <th>หมวดหมู่</th>
-          <th>ยอดในรอบบิล (บาท)</th>
-          <th>จ่ายคืนแล้ว (บาท)</th>
-          <th>ยอดค้าง (บาท)</th>
-          <th>หมายเหตุ</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-      </tbody>
-    </table>
-  </body>
-  </html>`;
-
-  const blob = new Blob(["\ufeff" + htmlDoc], { type: "application/vnd.ms-excel;charset=utf-8" });
-  downloadBlob(blob, `Expense-Report-${k}.xls`);
+  const csvString = csvRows.join("\r\n");
+  const blob = new Blob(["\ufeff" + csvString], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(blob, `Expense-Report-${k}.csv`);
 }
 
 // --- Setting Modal (Per-Channel Cutoff & Due Dates) ---
