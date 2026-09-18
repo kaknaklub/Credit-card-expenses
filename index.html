@@ -211,7 +211,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
     </div>
 
     <div class="section-title">
-      <h3>รายการล่าสุด</h3>
+      <h3>รายการประจำรอบบิลนี้</h3>
       <span id="cycleLabelText">รอบปัจจุบัน</span>
     </div>
     
@@ -295,7 +295,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
-<!-- Modal: ดูรายละเอียดเจาะลึกรายบุคคล (Person Detail Drilldown) -->
+<!-- Modal: ดูรายละเอียดเจาะลึกรายบุคคล -->
 <div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -483,6 +483,7 @@ if(db) {
   db.collection("entries").orderBy("createdAt", "desc").onSnapshot((snapshot) => {
     entries = [];
     snapshot.forEach((doc) => { entries.push({ id: doc.id, ...doc.data() }); });
+    refreshCycles();
     render();
   }, (error) => {
     document.getElementById("entriesList").innerHTML = `<div class="error-msg"><b>❌ ขัดข้อง</b><br>${error.message}</div>`;
@@ -521,10 +522,27 @@ function cycleLabel(k){
   let end = new Date(y, m-1, c); let start = new Date(y, m-2, c + 1);
   return `${pad(start.getDate())}/${pad(start.getMonth()+1)}/${start.getFullYear()+543} - ${pad(end.getDate())}/${pad(end.getMonth()+1)}/${end.getFullYear()+543}`;
 }
-function allKeys(){ return [...new Set(entries.map(x => keyFromDate(x.date)))].sort().reverse(); }
+
+// สร้างรายการรอบบิลครอบคลุมทั้งจากวันที่รายการปกติ และจากตารางงวดผ่อนในอนาคต/อดีต รวมทั้งรอบปัจจุบันอัตโนมัติ
+function allKeys(){
+  let keysSet = new Set();
+  const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`);
+  keysSet.add(nowKey);
+
+  entries.forEach(x => {
+    if(x.date) keysSet.add(keyFromDate(x.date));
+    if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => {
+        if(s.dueDate) keysSet.add(keyFromDate(s.dueDate));
+      });
+    }
+  });
+
+  return Array.from(keysSet).sort().reverse();
+}
+
 function refreshCycles(selected){
   let ks = allKeys();
-  if(!ks.length) ks = [keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`)];
   const s = document.getElementById("cycleSelect");
   const cur = selected || s.value || ks[0];
   s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join("");
@@ -642,6 +660,7 @@ async function confirmConvertToInstallment() {
   });
 
   closeConvertInstModal();
+  refreshCycles();
   alert("แปลงเป็นรายการผ่อนสำเร็จ!");
 }
 
@@ -649,14 +668,10 @@ async function confirmConvertToInstallment() {
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
 
-// ฟังก์ชันคำนวณยอด Effective Amount และยอดค้าง สำหรับรอบบิลที่เลือก
 function getEffectiveItemData(e, selectedCycleKey) {
   if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
-    // กรองหางวดที่ตรงกับรอบบิลที่เลือก (ผ่านฟังก์ชัน keyFromDate)
     let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDate(s.dueDate) === selectedCycleKey);
     let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
-    
-    // คำนวณว่าในงวดของรอบบิลนี้ จ่ายคืนไปเท่าไหร่แล้ว (เทียบจาก repayments คร่าวๆ หรือสถานะงวด)
     let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
     let effectiveRemain = effectiveAmount - paidSchedulesSum;
     
@@ -667,7 +682,6 @@ function getEffectiveItemData(e, selectedCycleKey) {
       isInstActiveInCycle: matchingSchedules.length > 0
     };
   } else {
-    // รายการปกติทั่วไป
     let r = getRepaidSum(e);
     let rm = e.amount - r;
     return {
@@ -688,7 +702,7 @@ function openRepayModal(id){
   document.getElementById("repayItemName").textContent = e.item;
   document.getElementById("repayRemainAmt").textContent = "฿" + money(eff.remain);
   document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
-  document.getElementById("repayInputAmt" ).value = ""; document.getElementById("repayImg").value = "";
+  document.getElementById("repayInputAmt").value = ""; document.getElementById("repayImg").value = "";
   document.getElementById("repayModal").classList.add("open");
 }
 function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
@@ -710,7 +724,6 @@ async function confirmRepay(){
     const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file);
     
     if (e.isInstallment && e.installmentPlan) {
-      // ถ้าเป็นผ่อนชำระ ให้ไปติ๊กสถานะ paid ของงวดในรอบบิลนี้ที่ยอดตรงกัน หรือใกลเคียง
       let currentCycleKey = document.getElementById("cycleSelect").value;
       let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDate(s.dueDate) === currentCycleKey && !s.paid);
       if (targetSchedule) {
@@ -799,7 +812,6 @@ function openPersonDetail(personName) {
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`;
   document.getElementById("personModalSubtitle").textContent = `รอบบิล: ${cycleLabel(k)}`;
   
-  // กรองรายการที่เกี่ยวข้องกับบุคคลนี้ในรอบบิลนี้
   const matchedEntries = entries.filter(x => {
     let inCycle = false;
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
@@ -819,9 +831,8 @@ function openPersonDetail(personName) {
 
   matchedEntries.forEach(x => {
     const eff = getEffectiveItemData(x, k);
-    if (!eff.isInstActiveInCycle && x.isInstallment) return; // ถ้าไม่มีงวดในรอบนี้ ข้าม
+    if (!eff.isInstActiveInCycle && x.isInstallment) return;
     
-    // ถ้าเป็น หารคู่ ให้หาร 2
     let multiplier = (x.owner === "Nu and B") ? 0.5 : 1.0;
     let itemSpent = eff.amount * multiplier;
     let itemRemain = eff.remain * multiplier;
@@ -860,7 +871,6 @@ function render(){
     document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   }
 
-  // คัดกรองรายการที่จะแสดงในรอบบิลนี้ (รองรับทั้งรายการปกติ และรายการผ่อนที่มีงวดในรอบบิลนี้)
   const es = entries.filter(x => {
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       return x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
@@ -875,14 +885,12 @@ function render(){
     const eff = getEffectiveItemData(x, k);
     tR += eff.remain;
 
-    // คำนวณยอดแยกตามเจ้าของ
     let ownerKey = x.owner;
     if(!pD[ownerKey]) pD[ownerKey] = { s: 0, p: 0, rm: 0 };
     pD[ownerKey].s += eff.amount;
     pD[ownerKey].p += eff.repaid;
     pD[ownerKey].rm += eff.remain;
 
-    // กรณีหารคู่ (Nu and B) ให้แยกยอดไปลงทั้ง Nu และ B คนละครึ่ง เพื่อให้ยอดแต่ละคนเห็นชัดเจน
     if(x.owner === "Nu and B") {
       ['Nu', 'B'].forEach(pName => {
         if(!pD[pName]) pD[pName] = { s: 0, p: 0, rm: 0 };
@@ -945,9 +953,6 @@ function render(){
 
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
   
-  // แสดงผลปุ่มสรุปยอดแยกรายบุคคล (คลิกเพื่อดูรายละเอียดได้)
-  let personKeys = Object.keys(pD).filter(p => p !== "Nu and B"); // เอาเฉพาะบุคคลเดี่ยวๆ หรือดึงทั้งหมด
-  // ถ้าต้องการบังคับแสดง Nu และ B เสมอ:
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B" && p !== "Nu and B"));
   
   document.getElementById("personSummary").innerHTML = displayPersons.map(p => {
