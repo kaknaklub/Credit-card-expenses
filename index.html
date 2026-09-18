@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>แชร์ค่าใช้จ่าย (Cloud)</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+<style>
+/* 🎨 Apple / iOS Design System */
+:root {
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --text: #1c1c1e;
+  --muted: #8e8e93;
+  --line: #c6c6c8;
+  --accent: #34c759; /* iOS Green */
+  --accent-hover: #2eb04f;
+  --blue: #007aff;
+  --danger: #ff3b30;
+  --orange: #ff9500;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { 
+  margin: 0; background: var(--bg); color: var(--text); 
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  line-height: 1.5; font-size: 16px; padding-bottom: 80px;
+}
+
+/* Glassmorphism Header */
+.header {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(242, 242, 247, 0.75);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  padding: 16px 20px; border-bottom: 0.5px solid rgba(198, 198, 200, 0.6);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+.header .icon-btn { background: transparent; border: none; font-size: 24px; color: var(--blue); padding: 0; cursor: pointer; }
+
+.wrap { max-width: 600px; margin: auto; padding: 16px; }
+
+/* Segmented Control (Tabs) */
+.segmented-control {
+  display: flex; background: #e3e3e8; border-radius: 9px; padding: 2px; margin-bottom: 20px;
+}
+.segment {
+  flex: 1; padding: 6px 0; font-size: 13px; font-weight: 600; border-radius: 7px; 
+  color: #000; background: transparent; border: none; cursor: pointer; transition: 0.2s;
+}
+.segment.active { background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04); }
+
+/* Card & Grouped Lists (iOS Settings Style) */
+.card {
+  background: var(--card); border-radius: 12px; margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden;
+}
+.card-header { padding: 16px 16px 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+
+.list-group { background: var(--card); border-radius: 12px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.list-item {
+  display: flex; align-items: center; justify-content: space-between; 
+  padding: 12px 16px; border-bottom: 0.5px solid var(--line); position: relative;
+}
+.list-item:last-child { border-bottom: none; }
+.list-item label { font-size: 16px; color: var(--text); flex-shrink: 0; font-weight: 400; }
+.list-item input, .list-item select {
+  flex: 1; text-align: right; border: none; background: transparent; font-size: 16px;
+  color: var(--muted); outline: none; margin-left: 16px; appearance: none; -webkit-appearance: none;
+}
+.list-item input:focus, .list-item select:focus { color: var(--text); }
+.list-item select { direction: rtl; } /* Right-align select text in iOS */
+
+.file-input-wrapper { display: flex; flex-direction: column; padding: 12px 16px; gap: 8px; }
+.file-input-wrapper label { font-size: 16px; }
+.file-input-wrapper input { font-size: 14px; color: var(--muted); }
+
+/* Buttons */
+.btn {
+  display: block; width: 100%; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 600;
+  border: none; cursor: pointer; transition: 0.2s transform cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.btn:active { transform: scale(0.96); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-blue { background: var(--blue); color: #fff; }
+.btn-danger { background: var(--card); color: var(--danger); text-align: center; border: 0.5px solid var(--line); }
+
+/* Dashboard UI */
+.balance-card { text-align: center; padding: 30px 20px; }
+.balance-card .label { font-size: 14px; color: var(--muted); font-weight: 500; margin-bottom: 4px; }
+.balance-card .amount { font-size: 40px; font-weight: 700; color: var(--text); letter-spacing: -1px; margin-bottom: 20px; }
+.split-grid { display: flex; gap: 12px; justify-content: center; }
+.split-item { flex: 1; background: var(--bg); padding: 12px; border-radius: 10px; }
+.split-item span { display: block; font-size: 12px; color: var(--muted); }
+.split-item strong { display: block; font-size: 18px; margin-top: 4px; color: var(--text); }
+
+/* Entry List UI */
+.entry-card { background: var(--card); margin-bottom: 12px; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.entry-header { display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center; font-size: 13px; color: var(--muted); }
+.status-pill { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.st-unpaid { background: #f2f2f7; color: var(--muted); }
+.st-partial { background: #fff5e6; color: var(--orange); }
+.st-paid { background: #e5f9eb; color: var(--accent); }
+
+.entry-body { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.entry-img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; background: #e3e3e8; flex-shrink: 0; cursor: pointer; }
+.entry-info { flex: 1; overflow: hidden; }
+.entry-info .title { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.entry-info .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.entry-amt { text-align: right; flex-shrink: 0; }
+.entry-amt .val { font-size: 17px; font-weight: 700; color: var(--text); }
+.entry-amt .rem { font-size: 12px; color: var(--danger); font-weight: 500; margin-top: 2px; }
+
+.tx-badge { background: #f2f2f7; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; color: var(--muted); display: inline-block; margin-top: 4px; }
+
+.entry-actions { display: flex; gap: 8px; border-top: 0.5px solid var(--line); padding-top: 12px; }
+.btn-sm { flex: 1; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: 600; border: none; cursor: pointer; background: var(--bg); color: var(--blue); }
+.btn-sm.red { color: var(--danger); }
+
+/* Repay History within Entry */
+.repay-box { background: var(--bg); border-radius: 8px; padding: 10px; margin-top: 12px; font-size: 13px; }
+.repay-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid var(--line); padding: 6px 0; }
+.repay-row:last-child { border-bottom: none; }
+
+/* Modals (Bottom Sheet) */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); align-items: flex-end; justify-content: center; z-index: 100; }
+.modal.open { display: flex; }
+.sheet { background: var(--bg); width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 12px 16px 30px; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); max-height: 90vh; overflow-y: auto; }
+.grabber { width: 36px; height: 5px; background: #c6c6c8; border-radius: 3px; margin: 0 auto 16px; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+#imgViewerModal .sheet { background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; animation: none; }
+#imgViewerModal img { max-width: 90vw; max-height: 90vh; border-radius: 16px; }
+
+.system-msg { text-align: center; padding: 30px 20px; color: var(--muted); font-size: 14px; }
+.error-msg { background: #ffe5e5; color: var(--danger); padding: 16px; border-radius: 12px; margin: 16px; font-size: 14px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>แชร์ค่าใช้จ่าย</h1>
+  <button class="icon-btn" onclick="openSettings()">⚙️</button>
+</div>
+
+<div class="wrap">
+  <div class="segmented-control">
+    <button class="segment active" id="tabSummary" onclick="showTab('summary')">สรุปยอด</button>
+    <button class="segment" id="tabEntries" onclick="showTab('entries')">ลงรายการใหม่</button>
+    <button class="segment" id="tabHistory" onclick="showTab('history')">ตั้งค่า & ส่งออก</button>
+  </div>
+
+  <!-- TAB: สรุปยอด -->
+  <section id="summaryTab">
+    <div class="list-group">
+      <div class="list-item">
+        <label>รอบบิล</label>
+        <select id="cycleSelect" onchange="render()"></select>
+      </div>
+    </div>
+
+    <div class="card balance-card">
+      <div class="label">ยอดคงค้างรอเคลียร์ทั้งหมด</div>
+      <div class="amount" id="sumOutstanding">฿0.00</div>
+      
+      <div class="split-grid" id="personSummary">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+
+    <div class="card-header">รายการล่าสุด (ออนไลน์)</div>
+    <div id="entriesList">
+      <div class="system-msg">กำลังโหลดข้อมูล... ⏳</div>
+    </div>
+  </section>
+
+  <!-- TAB: ลงรายการ -->
+  <section id="entriesTab" style="display:none">
+    <div class="card-header">รายละเอียดบิล</div>
+    <div class="list-group">
+      <div class="list-item"><label>วันที่</label><input id="date" type="date"></div>
+      <div class="list-item"><label>ยอดเงิน (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="list-item"><label>รายการ</label><input id="item" type="text" placeholder="ระบุชื่อรายการ"></div>
+    </div>
+
+    <div class="card-header">การจัดการ</div>
+    <div class="list-group">
+      <div class="list-item">
+        <label>ผู้รับผิดชอบ</label>
+        <select id="owner" onchange="toggleOwnerInput()">
+          <option value="Nu">Nu</option>
+          <option value="B">B</option>
+          <option value="Nu and B">Nu & B (หารร่วม)</option>
+          <option value="Other">อื่นๆ ระบุ...</option>
+        </select>
+      </div>
+      <div class="list-item" id="ownerCustomContainer" style="display:none;">
+        <label>ระบุชื่อ</label><input id="ownerCustom" type="text" placeholder="พิมพ์ชื่อ...">
+      </div>
+
+      <div class="list-item">
+        <label>ช่องทางจ่าย</label>
+        <select id="method" onchange="toggleTxNo()">
+          <option value="ShopeePay">ShopeePay</option>
+          <option value="SPayLater">S PayLater</option>
+          <option value="CreditCard">บัตรเครดิต</option>
+          <option value="Cash/Transfer">เงินสด / โอน</option>
+          <option value="Other">อื่นๆ</option>
+        </select>
+      </div>
+
+      <div class="list-item">
+        <label>หมวดหมู่</label>
+        <select id="category" onchange="toggleTxNo()">
+          <option value="ช้อปออนไลน์/Shopee">ช้อปออนไลน์ / Shopee</option>
+          <option value="อาหาร/เครื่องดื่ม">อาหาร / เครื่องดื่ม</option>
+          <option value="เดินทาง/น้ำมัน">เดินทาง / น้ำมัน</option>
+          <option value="บิล/สาธารณูปโภค">บิล / สาธารณูปโภค</option>
+          <option value="อื่นๆ">อื่นๆ</option>
+        </select>
+      </div>
+      <div class="list-item" id="catCustomContainer" style="display:none;">
+        <label>ระบุหมวดหมู่</label><input id="catCustom" type="text" placeholder="หมวดหมู่...">
+      </div>
+    </div>
+
+    <div id="txNoContainer" style="display:none;">
+      <div class="card-header">ข้อมูลอ้างอิงออนไลน์</div>
+      <div class="list-group">
+        <div class="list-item"><label>Order No.</label><input id="orderNo" type="text" placeholder="เลขออเดอร์"></div>
+        <div class="list-item"><label>Tx No.</label><input id="txNo" type="text" placeholder="เลขธุรกรรม"></div>
+      </div>
+    </div>
+
+    <div class="card-header">เพิ่มเติม</div>
+    <div class="list-group">
+      <div class="list-item"><label>หมายเหตุ</label><input id="note" type="text" placeholder="ไม่บังคับ"></div>
+      <div class="file-input-wrapper">
+        <label>📷 แนบรูปภาพ (สินค้า / ใบเสร็จ)</label>
+        <input id="entryImg" type="file" accept="image/*">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="addEntry()" id="btnAddEntry">บันทึกลงระบบ</button>
+  </section>
+
+  <!-- TAB: ประวัติ & ส่งออก -->
+  <section id="historyTab" style="display:none">
+    <div class="card-header">จัดการข้อมูล</div>
+    <div class="list-group">
+      <button class="btn btn-blue" style="border-radius:0; background:var(--card); color:var(--blue); text-align:left; border-bottom:0.5px solid var(--line)" onclick="exportExcel()">
+        📊 ดาวน์โหลดสรุปเป็น Excel (.xls)
+      </button>
+      <div style="padding:16px; font-size:13px; color:var(--muted)">ระบบจะดึงข้อมูลทั้งหมดจาก Cloud มาจัดเรียงเป็นไฟล์ Excel ให้คุณทันที</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- MODAL: ชำระคืน (Bottom Sheet) -->
+<div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h2 style="margin:0 0 20px; font-size:22px; text-align:center">ชำระคืน</h2>
+    
+    <div class="card balance-card" style="margin-bottom:20px; padding:20px">
+      <div class="label" id="repayItemName" style="color:var(--text); font-weight:600">ชื่อรายการ</div>
+      <div class="label" style="font-size:12px">ยอดคงค้าง</div>
+      <div class="amount" id="repayRemainAmt" style="color:var(--danger); margin-bottom:0; font-size:32px">฿0.00</div>
+    </div>
+
+    <div class="list-group">
+      <div class="list-item"><label>วันที่โอน</label><input id="repayDate" type="date"></div>
+      <div class="list-item"><label>ยอดเงิน</label><input id="repayInputAmt" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="file-input-wrapper">
+        <label>📷 แนบสลิปโอนเงิน (ไม่บังคับ)</label>
+        <input id="repayImg" type="file" accept="image/*">
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px">
+      <button class="btn" style="flex:1; background:var(--line); color:var(--text)" onclick="fillFullRepay()">เติมยอดเต็ม</button>
+      <button class="btn btn-primary" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button>
+    </div>
+    <input type="hidden" id="repayEntryId">
+  </div>
+</div>
+
+<!-- MODAL: ตั้งค่า (Bottom Sheet) -->
+<div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h2 style="margin:0 0 20px; font-size:22px; text-align:center">การตั้งค่า</h2>
+    
+    <div class="list-group">
+      <div class="list-item">
+        <label>วันตัดรอบบิล</label>
+        <input id="cutoffInput" type="number" min="1" max="28">
+      </div>
+    </div>
+    <div style="font-size:13px; color:var(--muted); margin:-10px 0 20px; padding:0 16px;">
+      ระบุวันที่ 1-28 (ค่านี้บันทึกเฉพาะในเครื่องคุณ)
+    </div>
+    <button class="btn btn-blue" onclick="saveSettings()">บันทึก</button>
+  </div>
+</div>
+
+<!-- MODAL: Image Viewer -->
+<div class="modal" id="imgViewerModal" onclick="closeImgViewer()">
+  <div class="sheet"><img id="fullViewImg" src=""></div>
+</div>
+
+<script>
+// --- Firebase Config & Error Handling ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDm85vVJ5KBwHImC6hVCSzjo7DUFmoMnug",
+  authDomain: "credit-card-expenses-e37d1.firebaseapp.com",
+  projectId: "credit-card-expenses-e37d1",
+  storageBucket: "credit-card-expenses-e37d1.firebasestorage.app",
+  messagingSenderId: "1001964023206",
+  appId: "1:1001964023206:web:c523fc5cebe855d73bf367",
+  measurementId: "G-LQG2FTGPRC"
+};
+
+let db;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+} catch (err) {
+  alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ");
+}
+
+let entries = [];
+let localSettings = JSON.parse(localStorage.getItem("cloud-app-settings")) || { cutoffDay: 17 };
+
+function saveSettingsLocal(){ localStorage.setItem("cloud-app-settings", JSON.stringify(localSettings)); }
+function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function fmtDate(s){ let d=parseDate(s); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()+543}`; }
+function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+
+// Realtime Listener
+if(db) {
+  db.collection("entries").orderBy("createdAt", "desc").onSnapshot((snapshot) => {
+    entries = [];
+    snapshot.forEach((doc) => { entries.push({ id: doc.id, ...doc.data() }); });
+    render();
+  }, (error) => {
+    document.getElementById("entriesList").innerHTML = `<div class="error-msg"><b>❌ ขัดข้อง</b><br>${error.message}</div>`;
+  });
+}
+
+function compressImage(file) {
+  return new Promise((resolve) => {
+    if(!file) return resolve(null);
+    const reader = new FileReader(); reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image(); img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas'); const MAX = 400; 
+        const scale = img.width > MAX ? (MAX / img.width) : 1;
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      }
+    }
+  });
+}
+
+function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
+function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
+
+function getCutoff() { return Number(localSettings.cutoffDay) || 17; }
+function keyFromDate(s){
+  const d = parseDate(s); const c = getCutoff();
+  if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  let n = new Date(d.getFullYear(), d.getMonth()+1, 1); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`;
+}
+function cycleLabel(k){
+  let [y,m] = k.split("-").map(Number); let c = getCutoff();
+  let end = new Date(y, m-1, c); let start = new Date(y, m-2, c + 1);
+  return `${pad(start.getDate())}/${pad(start.getMonth()+1)}/${start.getFullYear()+543} - ${pad(end.getDate())}/${pad(end.getMonth()+1)}/${end.getFullYear()+543}`;
+}
+function allKeys(){ return [...new Set(entries.map(x => keyFromDate(x.date)))].sort().reverse(); }
+function refreshCycles(selected){
+  let ks = allKeys();
+  if(!ks.length) ks = [keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`)];
+  const s = document.getElementById("cycleSelect");
+  const cur = selected || s.value || ks[0];
+  s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join("");
+  if(ks.includes(cur)) s.value = cur;
+}
+
+// UI Toggles
+function toggleOwnerInput(){ document.getElementById("ownerCustomContainer").style.display = document.getElementById("owner").value === "Other" ? "flex" : "none"; }
+function toggleTxNo(){
+  const m = document.getElementById("method").value.toLowerCase();
+  const c = document.getElementById("category").value.toLowerCase();
+  const isOnline = m.includes("shopee") || m.includes("spaylater") || c.includes("shopee") || c.includes("ออนไลน์");
+  document.getElementById("txNoContainer").style.display = isOnline ? "block" : "none";
+  document.getElementById("catCustomContainer").style.display = (document.getElementById("category").value === "อื่นๆ") ? "flex" : "none";
+}
+function getOwnerName(){
+  const r = document.getElementById("owner").value;
+  return r === "Other" ? (document.getElementById("ownerCustom").value.trim() || "ไม่ระบุ") : r;
+}
+
+// Actions
+async function addEntry(){
+  const btn = document.getElementById("btnAddEntry");
+  try {
+    const date = document.getElementById("date").value; const item = document.getElementById("item").value.trim();
+    const amount = Number(document.getElementById("amount").value);
+    const owner = getOwnerName(); const method = document.getElementById("method").value;
+    let category = document.getElementById("category").value;
+    if(category === "อื่นๆ" && document.getElementById("catCustom").value.trim() !== "") category = document.getElementById("catCustom").value.trim();
+    const note = document.getElementById("note").value.trim();
+    
+    const isTxVisible = document.getElementById("txNoContainer").style.display === "block";
+    const orderNo = isTxVisible ? document.getElementById("orderNo").value.trim() : "";
+    const txNo = isTxVisible ? document.getElementById("txNo").value.trim() : "";
+    
+    if(!date||!item||!Number.isFinite(amount)||amount<=0){alert("กรุณากรอกข้อมูลให้ครบ");return;}
+    if(!db) { alert("ไม่มีการเชื่อมต่อฐานข้อมูล"); return; }
+    
+    btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
+    const file = document.getElementById("entryImg").files[0];
+    const b64Img = await compressImage(file);
+    
+    await db.collection("entries").add({
+      date, item, amount, owner, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = "";
+    refreshCycles(keyFromDate(date));
+    showTab('summary');
+  } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกลงระบบ"; btn.disabled = false; }
+}
+
+function delEntry(id){ if(confirm("ลบรายการนี้?")){ db.collection("entries").doc(id).delete(); } }
+
+// Repayment
+let curRepayId = null;
+function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
+function getStatusInfo(e) {
+  const r = getRepaidSum(e); const rm = e.amount - r;
+  if(r === 0) return { l: 'ยังไม่ชำระ', c: 'st-unpaid', rm, r };
+  if(rm <= 0) return { l: 'ชำระครบ', c: 'st-paid', rm:0, r };
+  return { l: 'จ่ายบางส่วน', c: 'st-partial', rm, r };
+}
+
+function openRepayModal(id){
+  const e = entries.find(x => x.id === id); if(!e) return;
+  curRepayId = id; const st = getStatusInfo(e);
+  document.getElementById("repayItemName").textContent = e.item;
+  document.getElementById("repayRemainAmt").textContent = "฿" + money(st.rm);
+  document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
+  document.getElementById("repayInputAmt").value = "";
+  document.getElementById("repayImg").value = "";
+  document.getElementById("repayModal").classList.add("open");
+}
+function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
+function fillFullRepay(){
+  const e = entries.find(x => x.id === curRepayId); const st = getStatusInfo(e);
+  document.getElementById("repayInputAmt").value = st.rm > 0 ? st.rm : 0;
+}
+
+async function confirmRepay(){
+  const btn = document.getElementById("btnConfirmRepay");
+  if(!curRepayId) return;
+  try {
+    const date = document.getElementById("repayDate").value; const amt = Number(document.getElementById("repayInputAmt").value);
+    if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
+    btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
+    const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file);
+    const newRepay = { id: Date.now().toString(), date, amount: amt, image: b64Img };
+    await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+    closeRepayModal();
+  } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; }
+}
+
+function deleteRepay(eid, rid){
+  if(confirm("ลบประวัติการโอน?")){
+    const e = entries.find(x => x.id === eid);
+    const updatedRepayments = e.repayments.filter(r => r.id !== rid);
+    db.collection("entries").doc(eid).update({ repayments: updatedRepayments });
+  }
+}
+
+function render(){
+  if(document.getElementById("cycleSelect").options.length === 0) refreshCycles();
+  const k = document.getElementById("cycleSelect").value;
+  const es = entries.filter(x => keyFromDate(x.date) === k).sort((a,b)=>b.date.localeCompare(a.date));
+  
+  let tR=0; let pD={}; 
+
+  document.getElementById("entriesList").innerHTML = es.length ? es.map(x => {
+    const st = getStatusInfo(x); tR += st.rm;
+    if(!pD[x.owner]) pD[x.owner] = { s: 0, p: 0 };
+    pD[x.owner].s += x.amount; pD[x.owner].p += st.r;
+
+    let hHtml = "";
+    if(x.repayments && x.repayments.length > 0){
+      hHtml = `<div class="repay-box"><div style="color:var(--muted); margin-bottom:4px">ประวัติชำระ:</div>
+        ${x.repayments.map(r => `
+          <div class="repay-row">
+            <div style="display:flex; align-items:center; gap:8px">
+              ${r.image ? `<img src="${r.image}" style="width:24px;height:24px;border-radius:4px;object-fit:cover" onclick="viewImage(this.src)">` : ''}
+              <span style="color:var(--muted)">${fmtDate(r.date)}</span>
+            </div>
+            <div>
+              <strong style="color:var(--accent); margin-right:8px">฿${money(r.amount)}</strong>
+              <button style="border:none; background:transparent; color:var(--danger); padding:4px; cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button>
+            </div>
+          </div>
+        `).join("")}</div>`;
+    }
+
+    const orderH = x.orderNo ? `<div class="tx-badge">Ord: ${esc(x.orderNo)}</div>` : "";
+    const txH = x.transactionNo ? `<div class="tx-badge">Tx: ${esc(x.transactionNo)}</div>` : "";
+
+    return `<div class="entry-card">
+      <div class="entry-header">
+        <span>${fmtDate(x.date)}</span>
+        <span class="status-pill ${st.c}">${st.l}</span>
+      </div>
+      <div class="entry-body">
+        ${x.image ? `<img src="${x.image}" class="entry-img" onclick="viewImage(this.src)">` : `<div class="entry-img" style="display:flex;align-items:center;justify-content:center;font-size:20px">🛒</div>`}
+        <div class="entry-info">
+          <div class="title">${esc(x.item)}</div>
+          <div class="meta">${esc(x.owner)} • ${esc(x.method)}</div>
+          ${orderH} ${txH}
+        </div>
+        <div class="entry-amt">
+          <div class="val">฿${money(x.amount)}</div>
+          ${st.rm > 0 ? `<div class="rem">ค้าง ฿${money(st.rm)}</div>` : ``}
+        </div>
+      </div>
+      ${hHtml}
+      <div class="entry-actions">
+        ${st.rm > 0 ? `<button class="btn-sm" onclick="openRepayModal('${x.id}')">ชำระคืน</button>` : `<button class="btn-sm" disabled style="opacity:0.5">ครบแล้ว</button>`}
+        <button class="btn-sm red" onclick="delEntry('${x.id}')">ลบ</button>
+      </div>
+    </div>`;
+  }).join("") : `<div class="system-msg">ไม่มีรายการในรอบบิลนี้</div>`;
+
+  document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+  document.getElementById("personSummary").innerHTML = Object.keys(pD).length ? Object.keys(pD).map(p => {
+    let r = pD[p].s - pD[p].p;
+    return `<div class="split-item">
+      <span>${esc(p)}</span>
+      <strong style="color:${r>0?'var(--danger)':'var(--accent)'}">฿${money(r)}</strong>
+    </div>`;
+  }).join("") : '<div class="split-item"><span>ไม่มีข้อมูล</span><strong>฿0.00</strong></div>';
+}
+
+function showTab(t){ 
+  ["summary","entries","history"].forEach(x=>{ 
+    document.getElementById(x+"Tab").style.display = x===t ? "block" : "none"; 
+    document.getElementById("tab"+x[0].toUpperCase()+x.slice(1)).classList.toggle("active", x===t); 
+  }); 
+  window.scrollTo(0,0);
+}
+
+function openSettings(){ document.getElementById("cutoffInput").value = localSettings.cutoffDay; document.getElementById("settingsModal").classList.add("open"); }
+function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
+function saveSettings(){ let c = Number(document.getElementById("cutoffInput").value); if(c<1||c>28){alert("ระบุ 1-28");return;} localSettings.cutoffDay = c; saveSettingsLocal(); closeSettings(); refreshCycles(); render(); }
+function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
+
+function exportExcel(){
+  try {
+    if(entries.length === 0) { alert("ไม่มีข้อมูล"); return; }
+    const rows = [["รอบบิล","วันที่","รายการ","ผู้จ่าย","ช่องทาง","หมวดหมู่","OrderNo","TxNo","ยอดเต็ม","จ่ายคืนแล้ว","ยอดค้าง","หมายเหตุ"]];
+    entries.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=> {
+      const st = getStatusInfo(x);
+      rows.push([cycleLabel(keyFromDate(x.date)), fmtDate(x.date), x.item, x.owner, x.method, x.category||"", x.orderNo||"-", x.transactionNo||"-", Number(x.amount), Number(st.r), Number(st.rm), x.note||""]);
+    });
+    const detail = rows.map((r,i) => "<tr>"+r.map((v,j) => (j>=8 && j<=10 && i!==0)?`<td style="mso-number-format:'0.00'">${Number(v).toFixed(2)}</td>`:`<td>${String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</td>`).join("")+"</tr>").join("");
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>table{border-collapse:collapse}th,td{border:1px solid #bbb;padding:6px}th{background:#f2f2f7}</style></head><body><h2>รายงานค่าใช้จ่าย</h2><table>${detail}</table></body></html>`;
+    downloadBlob(new Blob(["\ufeff",doc], {type:"application/vnd.ms-excel;charset=utf-8"}), "expense-export.xls");
+  } catch (err) { alert("ผิดพลาด: " + err.message); }
+}
+
+function setup(){
+  const now = new Date(); document.getElementById("date").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  toggleOwnerInput(); toggleTxNo();
+}
+setup();
+</script>
+</body>
+</html>
