@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>แชร์ค่าใช้จ่าย - Pro Version</title>
+<title>แชร์ค่าใช้จ่าย - Pro Master Edition</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -199,9 +199,9 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
         <div class="icon">🎯</div>
         <span>ตั้งงบ</span>
       </div>
-      <div class="action-btn" onclick="exportCSV()">
+      <div class="action-btn" onclick="exportStyledHTML()">
         <div class="icon">📊</div>
-        <span>CSV</span>
+        <span>ชีทสวย</span>
       </div>
       <div class="action-btn" onclick="openVisualReport()">
         <div class="icon">🖼️</div>
@@ -272,21 +272,6 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       <div class="input-group"><label>💳 Transaction No.</label><input id="txNo" type="text" placeholder="เลขอ้างอิงการจ่าย"></div>
     </div>
 
-    <!-- Toggle ผ่อนชำระ -->
-    <div class="input-group" style="background:var(--bg); padding:12px; border-radius:14px; box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);">
-      <label style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin:0;">
-        <span>💳 เปลี่ยนเป็นรายการผ่อนชำระ (Installment)</span>
-        <input type="checkbox" id="isInstallment" onchange="toggleInstallmentConfig()" style="width:20px; height:20px; accent-color:var(--primary);">
-      </label>
-    </div>
-
-    <!-- ส่วนตั้งค่าผ่อนชำระ -->
-    <div id="installmentConfig" class="hidden" style="background:#e8f0eb; padding:14px; border-radius:16px; margin-bottom:16px; border:1px dashed var(--primary);">
-      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="instMonths" type="number" min="2" max="60" value="10"></div>
-      <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%) (ถ้ามี)</label><input id="instInterest" type="number" min="0" step="0.01" value="0" placeholder="0 หรือ 0.84"></div>
-      <div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="instStartDate" type="date"></div>
-    </div>
-
     <div class="input-group"><label>หมายเหตุ</label><input id="note" type="text" placeholder="รายละเอียดเพิ่มเติม"></div>
     <div class="input-group"><label>📷 แนบรูปภาพ (สินค้า/ใบเสร็จ)</label><input id="entryImg" type="file" accept="image/*"></div>
 
@@ -309,7 +294,23 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
-<!-- Modal: สรุปพรีเมียมพร้อมรูปภาพ & ตัวกรอง (Visual Report) -->
+<!-- Modal: แปลงรายการเก่าเป็นผ่อนชำระ -->
+<div class="modal" id="convertInstModal" onclick="if(event.target===this)closeConvertInstModal()">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 เปลี่ยนรายการนี้เป็นยอดผ่อน</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="convertInstItemName">-</div>
+    
+    <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="ciMonths" type="number" min="2" max="60" value="10"></div>
+    <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%) (ถ้ามี)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0" placeholder="0"></div>
+    <div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="ciStartDate" type="date"></div>
+
+    <button class="btn-main" style="margin-top:10px;" onclick="confirmConvertToInstallment()">ยืนยันสร้างตารางผ่อน</button>
+    <input type="hidden" id="convertEntryId">
+  </div>
+</div>
+
+<!-- Modal: สรุปพรีเมียมพร้อมรูปภาพ & ตัวกรอง -->
 <div class="modal" id="reportModal" onclick="if(event.target===this)closeReportModal()">
   <div class="sheet" style="max-width: 800px; height: 88vh; padding: 22px 16px;">
     <div class="grabber"></div>
@@ -363,7 +364,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: Repay (Bottom Sheet) -->
+<!-- Modal: Repay -->
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
   <div class="sheet">
     <div class="grabber"></div>
@@ -424,17 +425,16 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); }
 catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
 
 let entries = [];
-let localSettings = JSON.parse(localStorage.getItem("pro-app-settings")) || { cutoffDay: 17, budgets: {} };
+let localSettings = JSON.parse(localStorage.getItem("pro-master-settings")) || { cutoffDay: 17, budgets: {} };
 if(!localSettings.budgets) localSettings.budgets = {};
 
 // --- Utilities ---
-function saveSettingsLocal(){ localStorage.setItem("pro-app-settings", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("pro-master-settings", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
 function fmtDate(s){ let d=parseDate(s); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()+543}`; }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
-function escCSV(str){ return String(str??"").replace(/"/g, '""'); }
 
 // --- View Switching ---
 function switchView(view) {
@@ -451,7 +451,6 @@ function switchView(view) {
     document.getElementById('navProfile').classList.remove('active');
     const now = new Date();
     document.getElementById("date").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-    document.getElementById("instStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   }
   window.scrollTo(0,0);
 }
@@ -517,10 +516,6 @@ function toggleTxNo(){
   document.getElementById("txNoContainer").classList.toggle('hidden', !isOnline);
   document.getElementById("catCustomContainer").classList.toggle('hidden', document.getElementById("category").value !== "อื่นๆ");
 }
-function toggleInstallmentConfig() {
-  const isInst = document.getElementById("isInstallment").checked;
-  document.getElementById("installmentConfig").classList.toggle('hidden', !isInst);
-}
 function getOwnerName(){
   const r = document.querySelector('input[name="owner"]:checked').value;
   return r === "Other" ? (document.getElementById("ownerCustom").value.trim() || "ไม่ระบุ") : r;
@@ -532,7 +527,7 @@ function getIconForCategory(cat) {
   return "🏷️";
 }
 
-// --- Add Entry with Installment Logic ---
+// --- Add Entry (ปกติ ไม่บังคับสร้างผ่อนตั้งแต่แรก) ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -547,8 +542,6 @@ async function addEntry(){
     const orderNo = isTxVisible ? document.getElementById("orderNo").value.trim() : "";
     const txNo = isTxVisible ? document.getElementById("txNo").value.trim() : "";
     
-    const isInst = document.getElementById("isInstallment").checked;
-    
     if(!date||!item||!Number.isFinite(amount)||amount<=0){alert("กรุณากรอกข้อมูลให้ครบ");return;}
     
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
@@ -557,50 +550,13 @@ async function addEntry(){
     
     let entryData = {
       date, item, amount, owner, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [],
-      isInstallment: isInst,
+      isInstallment: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-
-    // คำนวณตารางงวดผ่อนชำระ
-    if(isInst) {
-      const months = Number(document.getElementById("instMonths").value) || 10;
-      const annualInterest = Number(document.getElementById("instInterest").value) || 0;
-      const startDateStr = document.getElementById("instStartDate").value || date;
-      
-      let totalToPay = amount;
-      if(annualInterest > 0) {
-        let totalInterest = amount * (annualInterest / 100) * (months / 12);
-        totalToPay = amount + totalInterest;
-      }
-      let perMonth = totalToPay / months;
-      
-      let schedules = [];
-      let [y, m, d] = startDateStr.split("-").map(Number);
-      
-      for(let i=1; i<=months; i++) {
-        let payDateObj = new Date(y, m - 1 + (i - 1), d);
-        let pY = payDateObj.getFullYear();
-        let pM = pad(payDateObj.getMonth() + 1);
-        let pD = pad(payDateObj.getDate());
-        let dateStr = `${pY}-${pM}-${pD}`;
-        
-        schedules.push({
-          no: i,
-          dueDate: dateStr,
-          amount: Number(perMonth.toFixed(2)),
-          paid: false
-        });
-      }
-
-      entryData.installmentPlan = {
-        months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules
-      };
-    }
     
     await db.collection("entries").add(entryData);
     
     document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = "";
-    document.getElementById("isInstallment").checked = false; toggleInstallmentConfig();
     
     refreshCycles(keyFromDate(date));
     switchView('home');
@@ -608,6 +564,63 @@ async function addEntry(){
 }
 
 function delEntry(id){ if(confirm("ลบรายการนี้?")){ db.collection("entries").doc(id).delete(); } }
+
+// --- แปลงรายการเก่าเป็นผ่อนชำระ ---
+function openConvertInstModal(id) {
+  const e = entries.find(x => x.id === id); if(!e) return;
+  document.getElementById("convertEntryId").value = id;
+  document.getElementById("convertInstItemName").textContent = `${e.item} (ยอดเต็ม: ฿${money(e.amount)})`;
+  const now = new Date();
+  document.getElementById("ciStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById("convertInstModal").classList.add("open");
+}
+function closeConvertInstModal() { document.getElementById("convertInstModal").classList.remove("open"); }
+
+async function confirmConvertToInstallment() {
+  const id = document.getElementById("convertEntryId").value;
+  const e = entries.find(x => x.id === id); if(!e) return;
+  
+  const months = Number(document.getElementById("ciMonths").value) || 10;
+  const annualInterest = Number(document.getElementById("ciInterest").value) || 0;
+  const startDateStr = document.getElementById("ciStartDate").value || e.date;
+  
+  let totalToPay = e.amount;
+  if(annualInterest > 0) {
+    let totalInterest = e.amount * (annualInterest / 100) * (months / 12);
+    totalToPay = e.amount + totalInterest;
+  }
+  let perMonth = totalToPay / months;
+  
+  let schedules = [];
+  let [y, m, d] = startDateStr.split("-").map(Number);
+  
+  for(let i=1; i<=months; i++) {
+    let payDateObj = new Date(y, m - 1 + (i - 1), d);
+    let pY = payDateObj.getFullYear();
+    let pM = pad(payDateObj.getMonth() + 1);
+    let pD = pad(payDateObj.getDate());
+    let dateStr = `${pY}-${pM}-${pD}`;
+    
+    schedules.push({
+      no: i,
+      dueDate: dateStr,
+      amount: Number(perMonth.toFixed(2)),
+      paid: false
+    });
+  }
+
+  const installmentPlan = {
+    months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules
+  };
+
+  await db.collection("entries").doc(id).update({
+    isInstallment: true,
+    installmentPlan
+  });
+
+  closeConvertInstModal();
+  alert("แปลงเป็นรายการผ่อนสำเร็จ!");
+}
 
 // --- Repayment ---
 let curRepayId = null;
@@ -751,7 +764,13 @@ function render(){
 
     const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : "";
     const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
-    const instBadge = x.isInstallment ? `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ ℹ️</span>` : "";
+    
+    let instBadge = "";
+    if(x.isInstallment) {
+      instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ ℹ️</span>`;
+    } else {
+      instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
+    }
 
     return `<div class="entry-card">
       <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="viewImage('${x.image}')"` : ''}>
@@ -783,7 +802,6 @@ function render(){
     </div>`;
   }).join("") : '<div class="split-badge"><span>ไม่มีข้อมูล</span><strong>฿0.00</strong></div>';
 
-  // คำนวณงบประมาณ
   let totalSpentInCycle = es.reduce((sum, item) => sum + item.amount, 0);
   let budgetLimit = localSettings.budgets[k] || 0;
   let budgetRemain = budgetLimit - totalSpentInCycle;
@@ -840,27 +858,74 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
+// --- ส่งออกไฟล์สวยหรูโทนพลาสเทล พร้อมหัวข้อและ Filter (เปิดใน Google Sheets ได้สมบูรณ์แบบ) ---
+function exportStyledHTML() {
+  if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
+  const k = document.getElementById("cycleSelect").value;
+  const es = entries.filter(x => keyFromDate(x.date) === k).sort((a,b)=>a.date.localeCompare(b.date));
+  
+  let rowsHtml = "";
+  es.forEach(x => {
+    const st = getStatusInfo(x);
+    rowsHtml += `<tr>
+      <td>${fmtDate(x.date)}</td>
+      <td><strong>${esc(x.item)}</strong></td>
+      <td>${esc(x.owner)}</td>
+      <td>${esc(x.method)}</td>
+      <td>${esc(x.category)}</td>
+      <td style="text-align:right;">${Number(x.amount).toFixed(2)}</td>
+      <td style="text-align:right; color:#5e8469;">${Number(st.r).toFixed(2)}</td>
+      <td style="text-align:right; color:#e26d6d;">${Number(st.rm).toFixed(2)}</td>
+      <td>${esc(x.note)}</td>
+    </tr>`;
+  });
+
+  const htmlDoc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      body { font-family: 'Prompt', sans-serif; background-color: #f2f6f4; padding: 20px; }
+      .header-title { font-size: 20px; font-weight: bold; color: #233128; margin-bottom: 5px; }
+      .sub-title { font-size: 13px; color: #7a9082; margin-bottom: 20px; }
+      table { border-collapse: collapse; width: 100%; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+      th { background-color: #9bc2a6; color: #ffffff; padding: 12px 10px; font-size: 13px; text-align: left; border: 1px solid #d5e2da; }
+      td { padding: 10px; font-size: 12.5px; color: #233128; border: 1px solid #d5e2da; }
+      tr:nth-child(even) { background-color: #f9fbf9; }
+    </style>
+  </head>
+  <body>
+    <div class="header-title">📊 รายงานสรุปค่าใช้จ่ายประจำรอบบิล</div>
+    <div class="sub-title">รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ GreenFlow Pro Master</div>
+    <table>
+      <thead>
+        <tr style="text-align:center;">
+          <th>วันที่</th>
+          <th>รายการ</th>
+          <th>ผู้จ่าย</th>
+          <th>ช่องทาง</th>
+          <th>หมวดหมู่</th>
+          <th>ยอดเต็ม (บาท)</th>
+          <th>จ่ายคืนแล้ว (บาท)</th>
+          <th>ยอดค้าง (บาท)</th>
+          <th>หมายเหตุ</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  </body>
+  </html>`;
+
+  const blob = new Blob(["\ufeff" + htmlDoc], { type: "application/vnd.ms-excel;charset=utf-8" });
+  downloadBlob(blob, `Expense-Report-${k}.xls`);
+}
+
 // --- Setting Modal ---
 function openSettings(){ document.getElementById("cutoffInput").value = localSettings.cutoffDay; document.getElementById("settingsModal").classList.add("open"); }
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
 function saveSettings(){ let c = Number(document.getElementById("cutoffInput").value); if(c<1||c>28){alert("ระบุ 1-28");return;} localSettings.cutoffDay = c; saveSettingsLocal(); closeSettings(); refreshCycles(); render(); }
 function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
-
-// --- CSV Export for Google Sheets ---
-function exportCSV(){
-  try {
-    if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
-    const headers = ["รอบบิล","วันที่","รายการ","ผู้จ่าย","ช่องทาง","หมวดหมู่","OrderNo","TxNo","ยอดเต็ม(บาท)","จ่ายคืนแล้ว(บาท)","ยอดค้าง(บาท)","หมายเหตุ"];
-    let csvContent = "\uFEFF" + headers.join(",") + "\n";
-    let exportEntries = entries.slice().sort((a,b)=>a.date.localeCompare(b.date));
-    exportEntries.forEach(x => {
-      const st = getStatusInfo(x);
-      let row = [cycleLabel(keyFromDate(x.date)), fmtDate(x.date), `"${escCSV(x.item)}"`, `"${escCSV(x.owner)}"`, `"${escCSV(x.method)}"`, `"${escCSV(x.category)}"`, `"${escCSV(x.orderNo)}"`, `"${escCSV(x.transactionNo)}"`, x.amount, st.r, st.rm, `"${escCSV(x.note)}"`];
-      csvContent += row.join(",") + "\n";
-    });
-    downloadBlob(new Blob([csvContent], {type:"text/csv;charset=utf-8;"}), "expense-pro-export.csv");
-  } catch (err) { alert("ผิดพลาด: " + err.message); }
-}
 
 function setup(){
   const now = new Date(); document.getElementById("date").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
