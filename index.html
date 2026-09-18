@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>แชร์ค่าใช้จ่าย - Ultimate Master Final Edition</title>
+<title>Credit Card & Loan Master Pro</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -37,8 +37,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .btn-icon:active { box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
 
 /* Mobile & PC Due Alert Banner */
-.due-alert-banner { background: #ffebeb; border: 1.5px solid var(--danger); border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #b73232; box-shadow: 0 4px 12px rgba(226,109,109,0.15); display: flex; align-items: flex-start; gap: 10px; animation: pulseAlert 2s infinite; }
-@keyframes pulseAlert { 0% { transform: scale(1); } 50% { transform: scale(1.01); } 100% { transform: scale(1); } }
+.due-alert-banner { background: #ffebeb; border: 1.5px solid var(--danger); border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #b73232; box-shadow: 0 4px 12px rgba(226,109,109,0.15); display: flex; align-items: flex-start; gap: 10px; }
 
 /* Balance Card & Budget */
 .balance-card { 
@@ -184,7 +183,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   <div id="view-home">
     <div class="header-top">
       <div>
-        <p>Ultimate Master Final Edition</p>
+        <p>Credit Card & Loan Master</p>
         <h1>แชร์ค่าใช้จ่าย</h1>
       </div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
@@ -204,7 +203,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       
       <!-- Quick Breakdown Button -->
       <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
-        💳 เช็กยอดหนี้แยกตามช่องทาง (ShopeePay, SPayLater, บัตรเครดิต, Lazada)
+        💳 เช็กยอดหนี้แยกตามช่องทาง & รอบบิลเฉพาะตัว
       </button>
 
       <!-- Budget Progress Section -->
@@ -278,10 +277,10 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
     <div class="input-group">
       <label>ช่องทางจ่าย</label>
       <select id="method" onchange="toggleTxNo()">
-        <option value="ShopeePay">ShopeePay</option>
-        <option value="SPayLater">S PayLater</option>
-        <option value="CreditCard">บัตรเครดิต</option>
+        <option value="CreditCard">บัตรเครดิตหลัก</option>
+        <option value="SPayLater">SPayLater</option>
         <option value="Lazada">Lazada / LazPayLater</option>
+        <option value="ShopeePay">ShopeePay</option>
         <option value="Cash/Transfer">เงินสด / โอน</option>
         <option value="Other">อื่นๆ</option>
       </select>
@@ -326,12 +325,12 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
-<!-- Modal: สรุปยอดหนี้แยกตามช่องทาง -->
+<!-- Modal: สรุปยอดหนี้แยกตามช่องทางและรอบบิลเฉพาะตัว -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
-    <h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทางจ่าย</h3>
-    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel">รอบบิล</div>
+    <h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง (รอบบิลเฉพาะตัว)</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel">ช่องทางจ่าย</div>
     
     <div style="max-height: 50vh; overflow-y: auto;" id="methodBreakdownContent"></div>
     <button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button>
@@ -454,24 +453,15 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: Settings -->
+<!-- Modal: Settings (ตั้งค่ารอบบิล & วันกำหนดจ่าย แยกรายช่องทาง) -->
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="sheet">
     <div class="grabber"></div>
-    <h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่าวันตัดรอบบิล & วันครบกำหนด</h3>
+    <h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิล & วันครบกำหนด (แยกรายช่องทาง)</h3>
     
-    <div class="input-group">
-      <label>วันตัดรอบบิล (วันที่ 1 - 28)</label>
-      <input id="cutoffInput" type="number" min="1" max="28">
-    </div>
+    <div style="max-height: 60vh; overflow-y: auto;" id="channelSettingsList"></div>
 
-    <h4 style="font-size:14px; margin:15px 0 8px; color:var(--primary-dark)">📅 วันครบกำหนดจ่ายของแต่ละช่องทาง (วันของเดือน)</h4>
-    <div class="input-group"><label>Credit Card (บัตรเครดิต)</label><input id="dueCC" type="number" min="1" max="31" placeholder="เช่น 30"></div>
-    <div class="input-group"><label>SPayLater / ShopeePay</label><input id="dueShopee" type="number" min="1" max="31" placeholder="เช่น 5"></div>
-    <div class="input-group"><label>Lazada / LazPayLater</label><input id="dueLazada" type="number" min="1" max="31" placeholder="เช่น 20"></div>
-    <div class="input-group"><label>บิลสาธารณูปโภค (ค่าน้ำ/ค่าไฟ)</label><input id="dueUtility" type="number" min="1" max="31" placeholder="เช่น 15"></div>
-
-    <button class="btn-main" style="margin-top:10px;" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+    <button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่าทั้งหมด</button>
   </div>
 </div>
 
@@ -498,17 +488,34 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); }
 catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
 
 let entries = [];
-let userChangedCycle = false; // ตัวแปรเช็กว่าผู้ใช้เปลี่ยนรอบบิลเองหรือยัง
-let localSettings = JSON.parse(localStorage.getItem("pro-master-settings")) || { 
-  cutoffDay: 17, 
+let userChangedCycle = false;
+
+// ค่าตั้งต้นรอบบิลและวันกำหนดจ่ายแยกรายช่องทาง
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || {
   budgets: {},
-  dueDates: { "CreditCard": 30, "SPayLater": 5, "Lazada": 20, "บิล/สาธารณูปโภค": 15 }
+  channels: {
+    "CreditCard": { cutoff: 17, due: 30 },
+    "SPayLater": { cutoff: 25, due: 5 },
+    "Lazada": { cutoff: 20, due: 20 },
+    "ShopeePay": { cutoff: 31, due: 5 },
+    "Cash/Transfer": { cutoff: 31, due: 31 },
+    "Other": { cutoff: 31, due: 31 }
+  }
 };
 if(!localSettings.budgets) localSettings.budgets = {};
-if(!localSettings.dueDates) localSettings.dueDates = { "CreditCard": 30, "SPayLater": 5, "Lazada": 20, "บิล/สาธารณูปโภค": 15 };
+if(!localSettings.channels) {
+  localSettings.channels = {
+    "CreditCard": { cutoff: 17, due: 30 },
+    "SPayLater": { cutoff: 25, due: 5 },
+    "Lazada": { cutoff: 20, due: 20 },
+    "ShopeePay": { cutoff: 31, due: 5 },
+    "Cash/Transfer": { cutoff: 31, due: 31 },
+    "Other": { cutoff: 31, due: 31 }
+  };
+}
 
 // --- Utilities ---
-function saveSettingsLocal(){ localStorage.setItem("pro-master-settings", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -566,16 +573,30 @@ function compressImage(file) {
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
 
-// --- Cycles ---
-function getCutoff() { return Number(localSettings.cutoffDay) || 17; }
-function keyFromDate(s){
-  const d = parseDate(s); const c = getCutoff();
-  if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
-  let n = new Date(d.getFullYear(), d.getMonth()+1, 1); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`;
+// --- Per-Channel Cycle Engine ---
+function getChannelCutoff(method) {
+  let ch = localSettings.channels[method] || localSettings.channels["CreditCard"];
+  return Number(ch.cutoff) || 17;
 }
+
+function keyFromDateForMethod(dateStr, method) {
+  const d = parseDate(dateStr);
+  const c = getChannelCutoff(method);
+  if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  let n = new Date(d.getFullYear(), d.getMonth()+1, 1);
+  return `${n.getFullYear()}-${pad(n.getMonth()+1)}`;
+}
+
+// สำหรับรอบบิลภาพรวมหน้าแรก อิงจากบัตรเครดิตหลักหรือวันที่เลือก
+function keyFromDate(s){
+  return keyFromDateForMethod(s, "CreditCard");
+}
+
 function cycleLabel(k){
-  let [y,m] = k.split("-").map(Number); let c = getCutoff();
-  let end = new Date(y, m-1, c); let start = new Date(y, m-2, c + 1);
+  let [y,m] = k.split("-").map(Number);
+  let c = getChannelCutoff("CreditCard");
+  let end = new Date(y, m-1, c); 
+  let start = new Date(y, m-2, c + 1);
   return `${pad(start.getDate())}/${pad(start.getMonth()+1)}/${start.getFullYear()+543} - ${pad(end.getDate())}/${pad(end.getMonth()+1)}/${end.getFullYear()+543}`;
 }
 
@@ -585,10 +606,11 @@ function allKeys(){
   keysSet.add(nowKey);
 
   entries.forEach(x => {
-    if(x.date) keysSet.add(keyFromDate(x.date));
+    let m = x.method || "CreditCard";
+    if(x.date) keysSet.add(keyFromDateForMethod(x.date, m));
     if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => {
-        if(s.dueDate) keysSet.add(keyFromDate(s.dueDate));
+        if(s.dueDate) keysSet.add(keyFromDateForMethod(s.dueDate, m));
       });
     }
   });
@@ -600,8 +622,6 @@ function refreshCycles(){
   let ks = allKeys();
   const s = document.getElementById("cycleSelect");
   const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`);
-  
-  // Standby ที่ปัจจุบันเสมอ ยกเว้นผู้ใช้กดเปลี่ยนเอง
   const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]);
   
   s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join("");
@@ -658,7 +678,7 @@ async function addEntry(){
     
     document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = "";
     
-    userChangedCycle = false; // กลับมาปัจจุบัน
+    userChangedCycle = false;
     refreshCycles();
     switchView('home');
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
@@ -747,8 +767,9 @@ let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
 
 function getEffectiveItemData(e, selectedCycleKey) {
+  let m = e.method || "CreditCard";
   if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
-    let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDate(s.dueDate) === selectedCycleKey);
+    let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
     let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
     let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
     let effectiveRemain = effectiveAmount - paidSchedulesSum;
@@ -803,7 +824,8 @@ async function confirmRepay(){
     
     if (e.isInstallment && e.installmentPlan) {
       let currentCycleKey = document.getElementById("cycleSelect").value;
-      let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDate(s.dueDate) === currentCycleKey && !s.paid);
+      let m = e.method || "CreditCard";
+      let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid);
       if (targetSchedule) {
         targetSchedule.paid = true;
         await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan });
@@ -887,13 +909,13 @@ function saveBudgetGoal() {
 // --- Check Due Dates & Mobile Alerts ---
 function checkDueAlerts(currentCycleKey) {
   const banner = document.getElementById("dueAlertBanner");
-  const dueDates = localSettings.dueDates || {};
+  const channels = localSettings.channels || {};
   const today = new Date();
   const currentDay = today.getDate();
   
   let alerts = [];
-  for(let method in dueDates) {
-    let dueDay = Number(dueDates[method]);
+  for(let method in channels) {
+    let dueDay = Number(channels[method].due);
     let diff = dueDay - currentDay;
     if(diff >= 0 && diff <= 3) {
       alerts.push(`ช่องทาง <b>${method}</b> ครบกำหนดชำระวันที่ ${dueDay} นี้ (เหลือ ${diff} วัน)`);
@@ -901,34 +923,39 @@ function checkDueAlerts(currentCycleKey) {
   }
 
   if(alerts.length > 0) {
-    banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนด่วนบนมือถือ:</strong><br>${alerts.join("<br>")}</div>`;
+    banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนกำหนดจ่ายด่วน:</strong><br>${alerts.join("<br>")}</div>`;
     banner.classList.remove("hidden");
   } else {
     banner.classList.add("hidden");
   }
 }
 
-// --- Modal: สรุปยอดหนี้แยกตามช่องทาง ---
+// --- Modal: สรุปยอดหนี้แยกตามช่องทาง (อิงรอบบิลเฉพาะตัวของแต่ละช่องทาง) ---
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value;
-  document.getElementById("methodModalCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  document.getElementById("methodModalCycleLabel").textContent = `อิงรอบบิลหลัก: ${cycleLabel(k)}`;
   
-  const es = entries.filter(x => {
-    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      return x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
-    }
-    return keyFromDate(x.date) === k;
-  });
-
+  const channels = localSettings.channels || {};
   let breakdown = {};
-  const dueDates = localSettings.dueDates || {};
 
-  es.forEach(x => {
-    const eff = getEffectiveItemData(x, k);
-    let m = x.method || "อื่นๆ";
-    if(!breakdown[m]) breakdown[m] = { total: 0, items: [] };
-    breakdown[m].total += eff.amount;
-    breakdown[m].items.push({ item: x.item, owner: x.owner, amount: eff.amount, remain: eff.remain });
+  entries.forEach(x => {
+    let m = x.method || "CreditCard";
+    let chCycleKey = keyFromDateForMethod(x.date, m);
+    
+    // ตรวจสอบว่าตรงกับรอบบิลที่เลือกดูอยู่หรือไม่
+    let matchCycle = false;
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
+    } else {
+      matchCycle = (chCycleKey === k);
+    }
+
+    if (matchCycle) {
+      const eff = getEffectiveItemData(x, k);
+      if(!breakdown[m]) breakdown[m] = { total: 0, items: [] };
+      breakdown[m].total += eff.amount;
+      breakdown[m].items.push({ item: x.item, owner: x.owner, amount: eff.amount, remain: eff.remain });
+    }
   });
 
   let html = "";
@@ -937,12 +964,12 @@ function openMethodBreakdownModal() {
   } else {
     for(let method in breakdown) {
       let dat = breakdown[method];
-      let dueDay = dueDates[method] ? ` (กำหนดจ่ายวันที่ ${dueDates[method]})` : '';
+      let chInfo = channels[method] || { cutoff: 17, due: 30 };
       html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--shadow-dark); padding-bottom:6px;">
           <div>
             <strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)}</strong>
-            <div style="font-size:11px; color:var(--text-muted);">${dueDay}</div>
+            <div style="font-size:11px; color:var(--text-muted);">ตัดรอบวันที่ ${chInfo.cutoff} | กำหนดจ่ายวันที่ ${chInfo.due}</div>
           </div>
           <strong style="font-size:15px; color:var(--text-main)">฿${money(dat.total)}</strong>
         </div>
@@ -970,11 +997,12 @@ function openPersonDetail(personName) {
   document.getElementById("personModalSubtitle").textContent = `รอบบิล: ${cycleLabel(k)}`;
   
   const matchedEntries = entries.filter(x => {
+    let m = x.method || "CreditCard";
     let inCycle = false;
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      inCycle = x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
+      inCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
     } else {
-      inCycle = (keyFromDate(x.date) === k);
+      inCycle = (keyFromDateForMethod(x.date, m) === k);
     }
     return inCycle && (x.owner === personName || x.owner === "Nu and B");
   });
@@ -983,7 +1011,6 @@ function openPersonDetail(personName) {
   let totalPaid = 0;
   let totalRemain = 0;
 
-  // จัดกลุ่มตามช่องทางการจ่ายเงิน (Method Breakdown)
   let methodGroups = {};
 
   matchedEntries.forEach(x => {
@@ -999,7 +1026,7 @@ function openPersonDetail(personName) {
     totalRemain += itemRemain;
     totalPaid += itemPaid;
 
-    let m = x.method || "อื่นๆ";
+    let m = x.method || "CreditCard";
     if(!methodGroups[m]) methodGroups[m] = [];
     methodGroups[m].push({ ...x, itemSpent, itemRemain });
   });
@@ -1059,10 +1086,11 @@ function render(){
   checkDueAlerts(k);
 
   const es = entries.filter(x => {
+    let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      return x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
+      return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
     }
-    return keyFromDate(x.date) === k;
+    return keyFromDateForMethod(x.date, m) === k;
   }).sort((a,b)=>b.date.localeCompare(a.date));
   
   let tR = 0; 
@@ -1110,8 +1138,9 @@ function render(){
     const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
     
     let instBadge = "";
+    let m = x.method || "CreditCard";
     if(x.isInstallment) {
-      let matchedS = x.installmentPlan.schedules.find(s => keyFromDate(s.dueDate) === k);
+      let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k);
       let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : "";
       instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`;
     } else {
@@ -1180,7 +1209,8 @@ function filterVisualReport() {
   const k = document.getElementById("cycleSelect").value;
   const keyword = document.getElementById("reportSearchInput").value.toLowerCase();
   const es = entries.filter(x => {
-    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k) : keyFromDate(x.date) === k;
+    let m = x.method || "CreditCard";
+    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : keyFromDateForMethod(x.date, m) === k;
     let matchKw = x.item.toLowerCase().includes(keyword) || x.owner.toLowerCase().includes(keyword) || x.category.toLowerCase().includes(keyword) || x.method.toLowerCase().includes(keyword);
     return inCycle && matchKw;
   }).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1216,7 +1246,8 @@ function exportStyledHTML() {
   if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
   const es = entries.filter(x => {
-    return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k) : keyFromDate(x.date) === k;
+    let m = x.method || "CreditCard";
+    return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : keyFromDateForMethod(x.date, m) === k;
   }).sort((a,b)=>a.date.localeCompare(b.date));
   
   let rowsHtml = "";
@@ -1250,7 +1281,7 @@ function exportStyledHTML() {
   </head>
   <body>
     <div class="header-title">📊 รายงานสรุปค่าใช้จ่ายประจำรอบบิล</div>
-    <div class="sub-title">รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ GreenFlow Pro Master</div>
+    <div class="sub-title">รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ CC & Loan Master</div>
     <table>
       <thead>
         <tr style="text-align:center;">
@@ -1276,34 +1307,45 @@ function exportStyledHTML() {
   downloadBlob(blob, `Expense-Report-${k}.xls`);
 }
 
-// --- Setting Modal ---
+// --- Setting Modal (Per-Channel Cutoff & Due Dates) ---
 function openSettings(){ 
-  document.getElementById("cutoffInput").value = localSettings.cutoffDay; 
-  document.getElementById("dueCC").value = localSettings.dueDates["CreditCard"] || "";
-  document.getElementById("dueShopee").value = localSettings.dueDates["SPayLater"] || "";
-  document.getElementById("dueLazada").value = localSettings.dueDates["Lazada"] || "";
-  document.getElementById("dueUtility").value = localSettings.dueDates["บิล/สาธารณูปโภค"] || "";
+  let html = "";
+  const channels = localSettings.channels || {};
+  const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
+  
+  channelNames.forEach(ch => {
+    let dat = channels[ch] || { cutoff: 17, due: 30 };
+    html += `<div style="background:var(--bg); padding:12px; border-radius:14px; margin-bottom:12px; box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);">
+      <strong style="font-size:14px; color:var(--primary-dark)">🏷️ ${ch}</strong>
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ (1-28)</label><input type="number" id="cutoff-${ch}" value="${dat.cutoff}" min="1" max="28"></div>
+        <div style="flex:1;"><label style="font-size:11px;">วันครบกำหนดจ่าย (1-31)</label><input type="number" id="due-${ch}" value="${dat.due}" min="1" max="31"></div>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById("channelSettingsList").innerHTML = html;
   document.getElementById("settingsModal").classList.add("open"); 
 }
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
-function saveSettings(){ 
-  let c = Number(document.getElementById("cutoffInput").value); 
-  if(c<1||c>28){alert("ระบุวันตัดรอบบิลระหว่าง 1-28");return;} 
-  localSettings.cutoffDay = c;
-  
-  localSettings.dueDates = {
-    "CreditCard": Number(document.getElementById("dueCC").value) || 30,
-    "SPayLater": Number(document.getElementById("dueShopee").value) || 5,
-    "Lazada": Number(document.getElementById("dueLazada").value) || 20,
-    "บิล/สาธารณูปโภค": Number(document.getElementById("dueUtility").value) || 15
-  };
 
+function saveSettings(){ 
+  const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
+  let newChannels = {};
+  
+  channelNames.forEach(ch => {
+    let cutoffVal = Number(document.getElementById(`cutoff-${ch}`).value) || 17;
+    let dueVal = Number(document.getElementById(`due-${ch}`).value) || 30;
+    newChannels[ch] = { cutoff: cutoffVal, due: dueVal };
+  });
+
+  localSettings.channels = newChannels;
   saveSettingsLocal(); 
   closeSettings(); 
   userChangedCycle = false;
   refreshCycles(); 
   render(); 
-  alert("บันทึกการตั้งค่าสำเร็จ!");
+  alert("บันทึกการตั้งค่ารอบบิลและวันกำหนดจ่ายสำเร็จ!");
 }
 
 function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
