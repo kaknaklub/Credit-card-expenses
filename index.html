@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>แชร์ค่าใช้จ่าย - Ultimate Master Pro Max</title>
+<title>แชร์ค่าใช้จ่าย - Ultimate Master Final Edition</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -36,8 +36,9 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .btn-icon { width: 42px; height: 42px; border-radius: 14px; background: var(--bg); border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light); display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .btn-icon:active { box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
 
-/* Due Alert Banner */
-.due-alert-banner { background: #ffebeb; border: 1px dashed var(--danger); border-radius: 14px; padding: 10px 14px; margin-bottom: 16px; font-size: 12.5px; color: var(--danger); display: flex; align-items: center; gap: 8px; }
+/* Mobile & PC Due Alert Banner */
+.due-alert-banner { background: #ffebeb; border: 1.5px solid var(--danger); border-radius: 16px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #b73232; box-shadow: 0 4px 12px rgba(226,109,109,0.15); display: flex; align-items: flex-start; gap: 10px; animation: pulseAlert 2s infinite; }
+@keyframes pulseAlert { 0% { transform: scale(1); } 50% { transform: scale(1.01); } 100% { transform: scale(1); } }
 
 /* Balance Card & Budget */
 .balance-card { 
@@ -48,7 +49,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
 
-/* Horizontal Scrollable Split Badges (แก้ปัญหาตกขอบ) */
+/* Horizontal Scrollable Split Badges */
 .split-badges-container { width: 100%; overflow-x: auto; white-space: nowrap; margin-bottom: 12px; padding-bottom: 4px; }
 .split-badges-container::-webkit-scrollbar { display: none; }
 .split-badges { display: inline-flex; gap: 8px; }
@@ -59,8 +60,8 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 
 /* Payment Breakdown Quick Pill */
 .method-breakdown-btn {
-  background: rgba(0,0,0,0.12); border: none; width: 100%; border-radius: 12px; padding: 8px 12px;
-  color: #fff; font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: rgba(0,0,0,0.12); border: none; width: 100%; border-radius: 12px; padding: 9px 12px;
+  color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
   transition: 0.2s; margin-bottom: 12px;
 }
 .method-breakdown-btn:active { background: rgba(0,0,0,0.2); }
@@ -183,20 +184,20 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   <div id="view-home">
     <div class="header-top">
       <div>
-        <p>Ultimate Master Pro Max</p>
+        <p>Ultimate Master Final Edition</p>
         <h1>แชร์ค่าใช้จ่าย</h1>
       </div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
 
-    <!-- Due Alert Banner -->
+    <!-- Mobile & PC Due Alert Banner -->
     <div id="dueAlertBanner" class="hidden"></div>
 
     <div class="balance-card">
-      <p>ยอดค้างรอบบิลนี้ (รอเคลียร์)</p>
+      <p>ยอดค้างรอบบิลปัจจุบัน (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
       
-      <!-- Horizontal Scrollable Split Badges (รองรับไม่จำกัดคน ไม่ตกขอบ) -->
+      <!-- Horizontal Scrollable Split Badges -->
       <div class="split-badges-container">
         <div class="split-badges" id="personSummary"></div>
       </div>
@@ -223,7 +224,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       <div class="action-btn">
         <div class="icon">📅</div>
         <span>รอบบิล</span>
-        <select id="cycleSelect" onchange="render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select>
+        <select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select>
       </div>
       <div class="action-btn" onclick="openBudgetModal()">
         <div class="icon">🎯</div>
@@ -240,7 +241,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
     </div>
 
     <div class="section-title">
-      <h3>รายการประจำรอบบิลนี้</h3>
+      <h3>รายการประจำรอบบิล</h3>
       <span id="cycleLabelText">รอบปัจจุบัน</span>
     </div>
     
@@ -337,7 +338,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: ดูรายละเอียดเจาะลึกรายบุคคล -->
+<!-- Modal: ดูรายละเอียดเจาะลึกรายบุคคล แยกตามช่องทางจ่าย พร้อมรูปภาพ -->
 <div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -354,7 +355,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       </div>
     </div>
 
-    <div style="max-height: 40vh; overflow-y: auto;" id="personEntriesList"></div>
+    <div style="max-height: 45vh; overflow-y: auto;" id="personEntriesList"></div>
     <button class="btn-main" style="margin-top:20px;" onclick="closePersonModal()">ปิดหน้าต่าง</button>
   </div>
 </div>
@@ -453,7 +454,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: Settings (ตั้งค่าวันตัดรอบ และวันครบกำหนดชำระแต่ละช่องทาง) -->
+<!-- Modal: Settings -->
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="sheet">
     <div class="grabber"></div>
@@ -497,6 +498,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); }
 catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
 
 let entries = [];
+let userChangedCycle = false; // ตัวแปรเช็กว่าผู้ใช้เปลี่ยนรอบบิลเองหรือยัง
 let localSettings = JSON.parse(localStorage.getItem("pro-master-settings")) || { 
   cutoffDay: 17, 
   budgets: {},
@@ -594,12 +596,16 @@ function allKeys(){
   return Array.from(keysSet).sort().reverse();
 }
 
-function refreshCycles(selected){
+function refreshCycles(){
   let ks = allKeys();
   const s = document.getElementById("cycleSelect");
-  const cur = selected || s.value || ks[0];
+  const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`);
+  
+  // Standby ที่ปัจจุบันเสมอ ยกเว้นผู้ใช้กดเปลี่ยนเอง
+  const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]);
+  
   s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join("");
-  if(ks.includes(cur)) s.value = cur;
+  if(ks.includes(targetKey)) s.value = targetKey;
 }
 
 // --- UI Toggles ---
@@ -652,7 +658,8 @@ async function addEntry(){
     
     document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = "";
     
-    refreshCycles(keyFromDate(date));
+    userChangedCycle = false; // กลับมาปัจจุบัน
+    refreshCycles();
     switchView('home');
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
@@ -877,7 +884,7 @@ function saveBudgetGoal() {
   render();
 }
 
-// --- Check Due Dates & Alerts ---
+// --- Check Due Dates & Mobile Alerts ---
 function checkDueAlerts(currentCycleKey) {
   const banner = document.getElementById("dueAlertBanner");
   const dueDates = localSettings.dueDates || {};
@@ -889,12 +896,12 @@ function checkDueAlerts(currentCycleKey) {
     let dueDay = Number(dueDates[method]);
     let diff = dueDay - currentDay;
     if(diff >= 0 && diff <= 3) {
-      alerts.push(`⚠️ ช่องทาง <b>${method}</b> มีกำหนดชำระในวันที่ ${dueDay} นี้แล้ว (เหลืออีก ${diff} วัน)`);
+      alerts.push(`ช่องทาง <b>${method}</b> ครบกำหนดชำระวันที่ ${dueDay} นี้ (เหลือ ${diff} วัน)`);
     }
   }
 
   if(alerts.length > 0) {
-    banner.innerHTML = `<div>🔔 <strong>แจ้งเตือนกำหนดจ่าย:</strong><br>${alerts.join("<br>")}</div>`;
+    banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนด่วนบนมือถือ:</strong><br>${alerts.join("<br>")}</div>`;
     banner.classList.remove("hidden");
   } else {
     banner.classList.add("hidden");
@@ -956,7 +963,7 @@ function openMethodBreakdownModal() {
 }
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล ---
+// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล (แยกตามช่องทางจ่าย พร้อมรูปภาพ) ---
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`;
@@ -976,8 +983,8 @@ function openPersonDetail(personName) {
   let totalPaid = 0;
   let totalRemain = 0;
 
-  let html = `<table class="report-table">
-    <tr><th>วันที่</th><th>รายการ</th><th>ยอดในรอบบิล</th><th>สถานะค้าง</th></tr>`;
+  // จัดกลุ่มตามช่องทางการจ่ายเงิน (Method Breakdown)
+  let methodGroups = {};
 
   matchedEntries.forEach(x => {
     const eff = getEffectiveItemData(x, k);
@@ -986,21 +993,49 @@ function openPersonDetail(personName) {
     let multiplier = (x.owner === "Nu and B") ? 0.5 : 1.0;
     let itemSpent = eff.amount * multiplier;
     let itemRemain = eff.remain * multiplier;
+    let itemPaid = itemSpent - itemRemain;
 
     totalSpent += itemSpent;
     totalRemain += itemRemain;
-    totalPaid += (itemSpent - itemRemain);
+    totalPaid += itemPaid;
 
-    html += `<tr>
-      <td>${fmtDate(x.date)}</td>
-      <td><strong>${esc(x.item)}</strong>${x.owner === "Nu and B" ? ' <span style="font-size:10px; color:var(--primary-dark)">(หารคู่)</span>' : ''}</td>
-      <td>฿${money(itemSpent)}</td>
-      <td style="color:${itemRemain > 0 ? 'var(--danger)' : 'var(--primary)'}"><strong>฿${money(itemRemain)}</strong></td>
-    </tr>`;
+    let m = x.method || "อื่นๆ";
+    if(!methodGroups[m]) methodGroups[m] = [];
+    methodGroups[m].push({ ...x, itemSpent, itemRemain });
   });
 
-  html += `</table>`;
-  if(matchedEntries.length === 0) html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่ายของ ${personName} ในรอบบิลนี้</div>`;
+  let html = "";
+  if(Object.keys(methodGroups).length === 0) {
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่ายของ ${personName} ในรอบบิลนี้</div>`;
+  } else {
+    for(let method in methodGroups) {
+      html += `<div style="margin-bottom:16px; background:var(--bg); padding:12px; border-radius:14px; box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);">
+        <div style="font-size:13.5px; font-weight:700; color:var(--primary-dark); margin-bottom:8px; border-bottom:1px solid var(--shadow-dark); padding-bottom:4px;">
+          💳 ช่องทาง: ${esc(method)}
+        </div>`;
+      
+      methodGroups[method].forEach(item => {
+        let imgTag = item.image ? `<img src="${item.image}" style="width:32px; height:32px; border-radius:8px; object-fit:cover; cursor:pointer; flex-shrink:0;" onclick="viewImage('${item.image}')">` : '<div style="width:32px; height:32px; border-radius:8px; background:var(--surface-white); display:flex; align-items:center; justify-content:center; font-size:14px;">🏷️</div>';
+        
+        html += `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; background:var(--surface-white); padding:8px 10px; border-radius:10px;">
+          <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+            ${imgTag}
+            <div style="overflow:hidden;">
+              <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.item)}${item.owner === "Nu and B" ? ' <span style="font-size:9.5px; color:var(--primary-dark)">(หารคู่)</span>' : ''}</div>
+              <div style="font-size:10.5px; color:var(--text-muted);">${fmtDate(item.date)}</div>
+            </div>
+          </div>
+          <div style="text-align:right; flex-shrink:0; margin-left:8px;">
+            <div style="font-size:13px; font-weight:700;">฿${money(item.itemSpent)}</div>
+            <div style="font-size:11px; color:${item.itemRemain > 0 ? 'var(--danger)' : 'var(--primary)'}; font-weight:600;">
+              ${item.itemRemain > 0 ? 'ค้าง ฿' + money(item.itemRemain) : 'ครบแล้ว'}
+            </div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+  }
 
   document.getElementById("pModalTotal").textContent = "฿" + money(totalSpent);
   document.getElementById("pModalPaid").textContent = "฿" + money(totalPaid);
@@ -1265,6 +1300,7 @@ function saveSettings(){
 
   saveSettingsLocal(); 
   closeSettings(); 
+  userChangedCycle = false;
   refreshCycles(); 
   render(); 
   alert("บันทึกการตั้งค่าสำเร็จ!");
