@@ -45,7 +45,8 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
 .split-badges { display: flex; gap: 8px; margin-bottom: 16px; }
-.split-badge { background: rgba(255,255,255,0.2); padding: 8px 10px; border-radius: 12px; flex: 1; backdrop-filter: blur(4px); }
+.split-badge { background: rgba(255,255,255,0.2); padding: 8px 10px; border-radius: 12px; flex: 1; backdrop-filter: blur(4px); cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+.split-badge:hover { background: rgba(255,255,255,0.3); border-color: rgba(255,255,255,0.5); }
 .split-badge span { display: block; font-size: 11px; opacity: 0.9; }
 .split-badge strong { display: block; font-size: 14px; margin-top: 2px; }
 
@@ -294,6 +295,28 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
+<!-- Modal: ดูรายละเอียดเจาะลึกรายบุคคล (Person Detail Drilldown) -->
+<div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
+  <div class="sheet" style="max-width: 600px;">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 6px; font-size:20px; text-align:center" id="personModalTitle">สรุปยอดของบุคคล</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="personModalSubtitle">รอบบิลนี้</div>
+    
+    <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
+      <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;">
+        <span>ยอดใช้จ่ายรวม: <strong id="pModalTotal">฿0.00</strong></span>
+        <span>ชำระคืนแล้ว: <strong id="pModalPaid" style="color:var(--primary)">฿0.00</strong></span>
+      </div>
+      <div style="font-size:14px; text-align:center; margin-top:8px; border-top:1px dashed var(--shadow-dark); padding-top:8px;">
+        ยอดคงค้างที่ต้องเคลียร์: <strong id="pModalRemain" style="color:var(--danger); font-size:18px;">฿0.00</strong>
+      </div>
+    </div>
+
+    <div style="max-height: 40vh; overflow-y: auto;" id="personEntriesList"></div>
+    <button class="btn-main" style="margin-top:20px;" onclick="closePersonModal()">ปิดหน้าต่าง</button>
+  </div>
+</div>
+
 <!-- Modal: แปลงรายการเก่าเป็นผ่อนชำระ -->
 <div class="modal" id="convertInstModal" onclick="if(event.target===this)closeConvertInstModal()">
   <div class="sheet">
@@ -527,7 +550,7 @@ function getIconForCategory(cat) {
   return "🏷️";
 }
 
-// --- Add Entry (ปกติ ไม่บังคับสร้างผ่อนตั้งแต่แรก) ---
+// --- Add Entry ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -625,24 +648,54 @@ async function confirmConvertToInstallment() {
 // --- Repayment ---
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
-function getStatusInfo(e) {
-  const r = getRepaidSum(e); const rm = e.amount - r;
-  if(r === 0) return { rm, r }; if(rm <= 0) return { rm:0, r }; return { rm, r };
+
+// ฟังก์ชันคำนวณยอด Effective Amount และยอดค้าง สำหรับรอบบิลที่เลือก
+function getEffectiveItemData(e, selectedCycleKey) {
+  if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
+    // กรองหางวดที่ตรงกับรอบบิลที่เลือก (ผ่านฟังก์ชัน keyFromDate)
+    let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDate(s.dueDate) === selectedCycleKey);
+    let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
+    
+    // คำนวณว่าในงวดของรอบบิลนี้ จ่ายคืนไปเท่าไหร่แล้ว (เทียบจาก repayments คร่าวๆ หรือสถานะงวด)
+    let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
+    let effectiveRemain = effectiveAmount - paidSchedulesSum;
+    
+    return {
+      amount: effectiveAmount,
+      repaid: paidSchedulesSum,
+      remain: effectiveRemain > 0 ? effectiveRemain : 0,
+      isInstActiveInCycle: matchingSchedules.length > 0
+    };
+  } else {
+    // รายการปกติทั่วไป
+    let r = getRepaidSum(e);
+    let rm = e.amount - r;
+    return {
+      amount: e.amount,
+      repaid: r,
+      remain: rm > 0 ? rm : 0,
+      isInstActiveInCycle: true
+    };
+  }
 }
 
 function openRepayModal(id){
   const e = entries.find(x => x.id === id); if(!e) return;
-  curRepayId = id; const st = getStatusInfo(e);
+  curRepayId = id; 
+  const currentCycleKey = document.getElementById("cycleSelect").value;
+  const eff = getEffectiveItemData(e, currentCycleKey);
+
   document.getElementById("repayItemName").textContent = e.item;
-  document.getElementById("repayRemainAmt").textContent = "฿" + money(st.rm);
+  document.getElementById("repayRemainAmt").textContent = "฿" + money(eff.remain);
   document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
-  document.getElementById("repayInputAmt").value = ""; document.getElementById("repayImg").value = "";
+  document.getElementById("repayInputAmt" ).value = ""; document.getElementById("repayImg").value = "";
   document.getElementById("repayModal").classList.add("open");
 }
 function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
 function fillFullRepay(){
-  const e = entries.find(x => x.id === curRepayId); const st = getStatusInfo(e);
-  document.getElementById("repayInputAmt").value = st.rm > 0 ? st.rm : 0;
+  const e = entries.find(x => x.id === curRepayId); const currentCycleKey = document.getElementById("cycleSelect").value;
+  const eff = getEffectiveItemData(e, currentCycleKey);
+  document.getElementById("repayInputAmt").value = eff.remain > 0 ? eff.remain : 0;
 }
 
 async function confirmRepay(){
@@ -650,9 +703,22 @@ async function confirmRepay(){
   if(!curRepayId) return;
   try {
     const date = document.getElementById("repayDate").value; const amt = Number(document.getElementById("repayInputAmt").value);
+    const e = entries.find(x => x.id === curRepayId);
     if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
+    
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
     const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file);
+    
+    if (e.isInstallment && e.installmentPlan) {
+      // ถ้าเป็นผ่อนชำระ ให้ไปติ๊กสถานะ paid ของงวดในรอบบิลนี้ที่ยอดตรงกัน หรือใกลเคียง
+      let currentCycleKey = document.getElementById("cycleSelect").value;
+      let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDate(s.dueDate) === currentCycleKey && !s.paid);
+      if (targetSchedule) {
+        targetSchedule.paid = true;
+        await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan });
+      }
+    }
+    
     const newRepay = { id: Date.now().toString(), date, amount: amt, image: b64Img };
     await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
     closeRepayModal();
@@ -727,6 +793,64 @@ function saveBudgetGoal() {
   render();
 }
 
+// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล ---
+function openPersonDetail(personName) {
+  const k = document.getElementById("cycleSelect").value;
+  document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`;
+  document.getElementById("personModalSubtitle").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  
+  // กรองรายการที่เกี่ยวข้องกับบุคคลนี้ในรอบบิลนี้
+  const matchedEntries = entries.filter(x => {
+    let inCycle = false;
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      inCycle = x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
+    } else {
+      inCycle = (keyFromDate(x.date) === k);
+    }
+    return inCycle && (x.owner === personName || x.owner === "Nu and B");
+  });
+
+  let totalSpent = 0;
+  let totalPaid = 0;
+  let totalRemain = 0;
+
+  let html = `<table class="report-table">
+    <tr><th>วันที่</th><th>รายการ</th><th>ยอดในรอบบิล</th><th>สถานะค้าง</th></tr>`;
+
+  matchedEntries.forEach(x => {
+    const eff = getEffectiveItemData(x, k);
+    if (!eff.isInstActiveInCycle && x.isInstallment) return; // ถ้าไม่มีงวดในรอบนี้ ข้าม
+    
+    // ถ้าเป็น หารคู่ ให้หาร 2
+    let multiplier = (x.owner === "Nu and B") ? 0.5 : 1.0;
+    let itemSpent = eff.amount * multiplier;
+    let itemRemain = eff.remain * multiplier;
+
+    totalSpent += itemSpent;
+    totalRemain += itemRemain;
+    totalPaid += (itemSpent - itemRemain);
+
+    html += `<tr>
+      <td>${fmtDate(x.date)}</td>
+      <td><strong>${esc(x.item)}</strong>${x.owner === "Nu and B" ? ' <span style="font-size:10px; color:var(--primary-dark)">(หารคู่)</span>' : ''}</td>
+      <td>฿${money(itemSpent)}</td>
+      <td style="color:${itemRemain > 0 ? 'var(--danger)' : 'var(--primary)'}"><strong>฿${money(itemRemain)}</strong></td>
+    </tr>`;
+  });
+
+  html += `</table>`;
+  if(matchedEntries.length === 0) html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่ายของ ${personName} ในรอบบิลนี้</div>`;
+
+  document.getElementById("pModalTotal").textContent = "฿" + money(totalSpent);
+  document.getElementById("pModalPaid").textContent = "฿" + money(totalPaid);
+  document.getElementById("pModalRemain").textContent = "฿" + money(totalRemain);
+  document.getElementById("personEntriesList").innerHTML = html;
+
+  document.getElementById("personModal").classList.add("open");
+}
+function closePersonModal() { document.getElementById("personModal").classList.remove("open"); }
+
+
 // --- Render Main List ---
 function render(){
   if(document.getElementById("cycleSelect").options.length === 0) refreshCycles();
@@ -736,13 +860,37 @@ function render(){
     document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   }
 
-  const es = entries.filter(x => keyFromDate(x.date) === k).sort((a,b)=>b.date.localeCompare(a.date));
-  let tR=0; let pD={}; 
+  // คัดกรองรายการที่จะแสดงในรอบบิลนี้ (รองรับทั้งรายการปกติ และรายการผ่อนที่มีงวดในรอบบิลนี้)
+  const es = entries.filter(x => {
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      return x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k);
+    }
+    return keyFromDate(x.date) === k;
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+  
+  let tR = 0; 
+  let pD = {}; 
 
   document.getElementById("entriesList").innerHTML = es.length ? es.map(x => {
-    const st = getStatusInfo(x); tR += st.rm;
-    if(!pD[x.owner]) pD[x.owner] = { s: 0, p: 0 };
-    pD[x.owner].s += x.amount; pD[x.owner].p += st.r;
+    const eff = getEffectiveItemData(x, k);
+    tR += eff.remain;
+
+    // คำนวณยอดแยกตามเจ้าของ
+    let ownerKey = x.owner;
+    if(!pD[ownerKey]) pD[ownerKey] = { s: 0, p: 0, rm: 0 };
+    pD[ownerKey].s += eff.amount;
+    pD[ownerKey].p += eff.repaid;
+    pD[ownerKey].rm += eff.remain;
+
+    // กรณีหารคู่ (Nu and B) ให้แยกยอดไปลงทั้ง Nu และ B คนละครึ่ง เพื่อให้ยอดแต่ละคนเห็นชัดเจน
+    if(x.owner === "Nu and B") {
+      ['Nu', 'B'].forEach(pName => {
+        if(!pD[pName]) pD[pName] = { s: 0, p: 0, rm: 0 };
+        pD[pName].s += eff.amount * 0.5;
+        pD[pName].p += eff.repaid * 0.5;
+        pD[pName].rm += eff.remain * 0.5;
+      });
+    }
 
     let hHtml = "";
     if(x.repayments && x.repayments.length > 0){
@@ -767,7 +915,9 @@ function render(){
     
     let instBadge = "";
     if(x.isInstallment) {
-      instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ ℹ️</span>`;
+      let matchedS = x.installmentPlan.schedules.find(s => keyFromDate(s.dueDate) === k);
+      let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : "";
+      instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`;
     } else {
       instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
     }
@@ -786,23 +936,29 @@ function render(){
         ${hHtml}
       </div>
       <div class="entry-right">
-        <h4>฿${money(x.amount)}</h4>
-        ${st.rm > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(st.rm)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
+        <h4>฿${money(eff.amount)}</h4>
+        ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
         <button style="border:none; background:transparent; color:var(--text-muted); font-size:15px; margin-top:6px; cursor:pointer" onclick="delEntry('${x.id}')">🗑️</button>
       </div>
     </div>`;
   }).join("") : `<div style="text-align:center; padding: 40px 20px; color: var(--text-muted); font-size:13.5px">ยังไม่มีรายการค่าใช้จ่ายในรอบบิลนี้<br><br>กดปุ่ม + ด้านล่างเพื่อเริ่มบันทึกเลย! 🌿</div>`;
 
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
-  document.getElementById("personSummary").innerHTML = Object.keys(pD).length ? Object.keys(pD).map(p => {
-    let r = pD[p].s - pD[p].p;
-    return `<div class="split-badge">
-      <span>${esc(p)}</span>
-      <strong style="color:${r>0?'#ffebeb':'#ffffff'}">฿${money(r)}</strong>
+  
+  // แสดงผลปุ่มสรุปยอดแยกรายบุคคล (คลิกเพื่อดูรายละเอียดได้)
+  let personKeys = Object.keys(pD).filter(p => p !== "Nu and B"); // เอาเฉพาะบุคคลเดี่ยวๆ หรือดึงทั้งหมด
+  // ถ้าต้องการบังคับแสดง Nu และ B เสมอ:
+  let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B" && p !== "Nu and B"));
+  
+  document.getElementById("personSummary").innerHTML = displayPersons.map(p => {
+    let dat = pD[p] || { s: 0, p: 0, rm: 0 };
+    return `<div class="split-badge" onclick="openPersonDetail('${p}')" title="คลิกเพื่อดูรายละเอียดของ ${p}">
+      <span>👤 ${esc(p)} (คลิกดู)</span>
+      <strong style="color:${dat.rm > 0 ? '#ffebeb' : '#ffffff'}">฿${money(dat.rm)}</strong>
     </div>`;
-  }).join("") : '<div class="split-badge"><span>ไม่มีข้อมูล</span><strong>฿0.00</strong></div>';
+  }).join("");
 
-  let totalSpentInCycle = es.reduce((sum, item) => sum + item.amount, 0);
+  let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).amount, 0);
   let budgetLimit = localSettings.budgets[k] || 0;
   let budgetRemain = budgetLimit - totalSpentInCycle;
   let percent = budgetLimit > 0 ? Math.min(100, (totalSpentInCycle / budgetLimit) * 100) : 0;
@@ -812,7 +968,7 @@ function render(){
   document.getElementById("budgetProgressBar").style.width = percent + "%";
 }
 
-// --- Visual Report (สรุปพรีเมียมพร้อมค้นหา & รูป) ---
+// --- Visual Report ---
 function openVisualReport() {
   const k = document.getElementById("cycleSelect").value;
   if(!k) return alert("กรุณาเลือกรอบบิล");
@@ -826,17 +982,17 @@ function closeReportModal() { document.getElementById('reportModal').classList.r
 function filterVisualReport() {
   const k = document.getElementById("cycleSelect").value;
   const keyword = document.getElementById("reportSearchInput").value.toLowerCase();
-  const es = entries.filter(x => keyFromDate(x.date) === k && (
-    x.item.toLowerCase().includes(keyword) || 
-    x.owner.toLowerCase().includes(keyword) || 
-    x.category.toLowerCase().includes(keyword) || 
-    x.method.toLowerCase().includes(keyword)
-  )).sort((a,b)=>a.date.localeCompare(b.date));
+  const es = entries.filter(x => {
+    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k) : keyFromDate(x.date) === k;
+    let matchKw = x.item.toLowerCase().includes(keyword) || x.owner.toLowerCase().includes(keyword) || x.category.toLowerCase().includes(keyword) || x.method.toLowerCase().includes(keyword);
+    return inCycle && matchKw;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
   
   let html = `<table class="report-table">
-    <tr><th>วันที่</th><th>รายการ</th><th>ยอดเงิน</th><th>ผู้จ่าย</th><th>รูป/สลิป</th><th>สลิปคืน</th></tr>`;
+    <tr><th>วันที่</th><th>รายการ</th><th>ยอดในรอบบิล</th><th>ผู้จ่าย</th><th>รูป/สลิป</th><th>สลิปคืน</th></tr>`;
     
   es.forEach(x => {
+    const eff = getEffectiveItemData(x, k);
     let imgHtml = x.image ? `<img src="${x.image}" style="width:36px; height:36px; object-fit:cover; border-radius:8px; cursor:pointer;" onclick="viewImage('${x.image}')">` : '-';
     let repayImgHtml = '';
     if (x.repayments && x.repayments.length > 0) {
@@ -847,7 +1003,7 @@ function filterVisualReport() {
     html += `<tr>
       <td>${fmtDate(x.date)}</td>
       <td><strong>${esc(x.item)}</strong></td>
-      <td style="color:var(--primary-dark)"><strong>฿${money(x.amount)}</strong></td>
+      <td style="color:var(--primary-dark)"><strong>฿${money(eff.amount)}</strong></td>
       <td>${esc(x.owner)}</td>
       <td style="text-align:center">${imgHtml}</td>
       <td style="text-align:center">${repayImgHtml}</td>
@@ -858,24 +1014,26 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์สวยหรูโทนพลาสเทล พร้อมหัวข้อและ Filter (เปิดใน Google Sheets ได้สมบูรณ์แบบ) ---
+// --- ส่งออกไฟล์สวยหรูโทนพลาสเทล พร้อมหัวข้อและ Filter ---
 function exportStyledHTML() {
   if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
-  const es = entries.filter(x => keyFromDate(x.date) === k).sort((a,b)=>a.date.localeCompare(b.date));
+  const es = entries.filter(x => {
+    return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDate(s.dueDate) === k) : keyFromDate(x.date) === k;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
   
   let rowsHtml = "";
   es.forEach(x => {
-    const st = getStatusInfo(x);
+    const eff = getEffectiveItemData(x, k);
     rowsHtml += `<tr>
       <td>${fmtDate(x.date)}</td>
       <td><strong>${esc(x.item)}</strong></td>
       <td>${esc(x.owner)}</td>
       <td>${esc(x.method)}</td>
       <td>${esc(x.category)}</td>
-      <td style="text-align:right;">${Number(x.amount).toFixed(2)}</td>
-      <td style="text-align:right; color:#5e8469;">${Number(st.r).toFixed(2)}</td>
-      <td style="text-align:right; color:#e26d6d;">${Number(st.rm).toFixed(2)}</td>
+      <td style="text-align:right;">${Number(eff.amount).toFixed(2)}</td>
+      <td style="text-align:right; color:#5e8469;">${Number(eff.repaid).toFixed(2)}</td>
+      <td style="text-align:right; color:#e26d6d;">${Number(eff.remain).toFixed(2)}</td>
       <td>${esc(x.note)}</td>
     </tr>`;
   });
@@ -904,7 +1062,7 @@ function exportStyledHTML() {
           <th>ผู้จ่าย</th>
           <th>ช่องทาง</th>
           <th>หมวดหมู่</th>
-          <th>ยอดเต็ม (บาท)</th>
+          <th>ยอดในรอบบิล (บาท)</th>
           <th>จ่ายคืนแล้ว (บาท)</th>
           <th>ยอดค้าง (บาท)</th>
           <th>หมายเหตุ</th>
