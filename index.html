@@ -36,7 +36,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .header-top p { margin: 0; font-size: 14px; color: var(--text-muted); }
 .btn-icon { width: 44px; height: 44px; border-radius: 16px; background: var(--bg); border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light); display: flex; align-items: center; justify-content: center; }
 
-/* Balance Card (Solid Green) */
+/* Balance Card */
 .balance-card { 
   background: linear-gradient(135deg, var(--primary-light), var(--primary));
   border-radius: 28px; padding: 24px; color: #fff; margin-bottom: 24px;
@@ -54,7 +54,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 /* Action Buttons (Neumorphic) */
 .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
 .action-btn { 
-  background: var(--bg); border: none; border-radius: 20px; padding: 16px 10px; 
+  background: var(--bg); border: none; border-radius: 20px; padding: 16px 10px; position: relative;
   box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: 0.2s;
 }
@@ -67,7 +67,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .section-title h3 { margin: 0; font-size: 18px; font-weight: 600; }
 .section-title span { font-size: 13px; color: var(--primary); font-weight: 500; cursor: pointer; }
 
-/* Transaction List (Soft UI) */
+/* Transaction List */
 .entry-card { 
   background: var(--surface-white); border-radius: 20px; padding: 16px; margin-bottom: 16px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.03); display: flex; gap: 14px; align-items: center;
@@ -88,7 +88,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .entry-right p { margin: 0; font-size: 11px; font-weight: 600; }
 .c-red { color: var(--danger) !important; } .c-green { color: var(--primary) !important; }
 
-/* Form Elements (Neumorphic Inset) */
+/* Form Elements */
 .input-group { margin-bottom: 20px; }
 .input-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-main); padding-left: 4px; }
 input, select {
@@ -139,10 +139,16 @@ input[type="file"] { padding: 12px; font-size: 13px; color: var(--text-muted); }
 .grabber { width: 40px; height: 5px; background: var(--shadow-dark); border-radius: 3px; margin: 0 auto 24px; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
+/* Report Table */
+.report-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.report-table th { padding: 12px 8px; border-bottom: 2px solid var(--shadow-dark); color: var(--text-muted); white-space: nowrap; }
+.report-table td { padding: 12px 8px; border-bottom: 1px solid var(--shadow-light); vertical-align: middle; }
+
 /* Utils */
 .hidden { display: none !important; }
 .error-msg { background: #ffebeb; color: var(--danger); padding: 16px; border-radius: 16px; font-size: 14px; text-align: center; margin-bottom: 20px; }
-#imgViewerModal .sheet { background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; animation: none; box-shadow: none; }
+#imgViewerModal { z-index: 110; }
+#imgViewerModal .sheet { background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; animation: none; box-shadow: none; border-radius: 0; }
 #imgViewerModal img { max-width: 90vw; max-height: 90vh; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
 </style>
 </head>
@@ -154,35 +160,34 @@ input[type="file"] { padding: 12px; font-size: 13px; color: var(--text-muted); }
   <div id="view-home">
     <div class="header-top">
       <div>
-        <p>Good morning,</p>
-        <h1>My Wallet</h1>
+        <p>Shared Expense</p>
+        <h1>แชร์ค่าใช้จ่าย</h1>
       </div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
 
     <div class="balance-card">
-      <p>Total Outstanding (รอเคลียร์)</p>
+      <p>ยอดคงค้างรอบินนี้ (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
       <div class="split-badges" id="personSummary">
-        <!-- Injected -->
+        <!-- Injected via JS -->
       </div>
     </div>
 
+    <!-- 3 ปุ่มจัดการข้อมูลหลัก -->
     <div class="action-grid">
-      <div class="action-btn" onclick="document.getElementById('cycleSelect').focus()">
-        <div class="icon">📅</div>
-        <span>รอบบิล</span>
-      </div>
-      <div class="action-btn" onclick="exportExcel()">
-        <div class="icon">📊</div>
-        <span>ส่งออก</span>
-      </div>
       <div class="action-btn">
-        <div class="icon">
-          <select id="cycleSelect" onchange="render()" style="position:absolute; opacity:0; width:40px; height:40px; cursor:pointer"></select>
-          🔍
-        </div>
-        <span>เลือกบิล</span>
+        <div class="icon">📅</div>
+        <span>เลือกรอบบิล</span>
+        <select id="cycleSelect" onchange="render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select>
+      </div>
+      <div class="action-btn" onclick="exportCSV()">
+        <div class="icon">📊</div>
+        <span>ออก CSV</span>
+      </div>
+      <div class="action-btn" onclick="openVisualReport()">
+        <div class="icon">🖼️</div>
+        <span>สรุป+รูป</span>
       </div>
     </div>
 
@@ -301,6 +306,23 @@ input[type="file"] { padding: 12px; font-size: 13px; color: var(--text-muted); }
 
 <!-- ================= MODALS ================= -->
 
+<!-- Modal: ดูตารางสรุปพร้อมรูปภาพ (Visual Report) -->
+<div class="modal" id="reportModal" onclick="if(event.target===this)closeReportModal()">
+  <div class="sheet" style="max-width: 800px; height: 85vh; padding: 24px 16px;">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 16px; font-size:20px; text-align:center">สรุปรายการพร้อมรูปภาพ</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom: 20px;">
+      รอบบิล: <span id="reportCycleLabel"></span>
+    </div>
+    
+    <div style="overflow-x: auto; background: var(--bg); border-radius: 16px; padding: 10px; box-shadow: inset 4px 4px 8px var(--shadow-dark), inset -4px -4px 8px var(--shadow-light);">
+      <div id="reportContent"></div>
+    </div>
+    
+    <button class="btn-main" style="margin-top:24px" onclick="closeReportModal()">ปิดหน้าต่างนี้</button>
+  </div>
+</div>
+
 <!-- Modal: Repay (Bottom Sheet) -->
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
   <div class="sheet">
@@ -330,13 +352,11 @@ input[type="file"] { padding: 12px; font-size: 13px; color: var(--text-muted); }
   <div class="sheet">
     <div class="grabber"></div>
     <h3 style="margin:0 0 20px; font-size:20px; text-align:center">ตั้งค่าระบบ</h3>
-    
     <div class="input-group">
       <label>วันตัดรอบบิล (วันที่ 1 - 28)</label>
       <input id="cutoffInput" type="number" min="1" max="28">
     </div>
     <p style="font-size:12px; color:var(--text-muted); margin:-10px 0 24px;">ค่านี้จะบันทึกเฉพาะในเครื่องของคุณ</p>
-    
     <button class="btn-main" onclick="saveSettings()">บันทึกการตั้งค่า</button>
   </div>
 </div>
@@ -348,7 +368,7 @@ input[type="file"] { padding: 12px; font-size: 13px; color: var(--text-muted); }
 
 
 <script>
-// --- Firebase Config & Error Handling ---
+// --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyDm85vVJ5KBwHImC6hVCSzjo7DUFmoMnug",
   authDomain: "credit-card-expenses-e37d1.firebaseapp.com",
@@ -360,10 +380,8 @@ const firebaseConfig = {
 };
 
 let db;
-try {
-  firebase.initializeApp(firebaseConfig);
-  db = firebase.firestore();
-} catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
+try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } 
+catch (err) { alert("ระบบฐานข้อมูลขัดข้อง โปรดรีเฟรชหน้าเว็บ"); }
 
 let entries = [];
 let localSettings = JSON.parse(localStorage.getItem("cloud-app-settings")) || { cutoffDay: 17 };
@@ -375,20 +393,17 @@ function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
 function fmtDate(s){ let d=parseDate(s); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()+543}`; }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+function escCSV(str){ return String(str??"").replace(/"/g, '""'); }
 
 // --- View Switching ---
 function switchView(view) {
   document.getElementById('view-home').classList.add('hidden');
   document.getElementById('view-add').classList.add('hidden');
-  
   if(view === 'home' || view === 'profile') {
     document.getElementById('view-home').classList.remove('hidden');
     document.getElementById('navHome').classList.toggle('active', view === 'home');
     document.getElementById('navProfile').classList.toggle('active', view === 'profile');
-    if(view === 'profile') {
-      alert("หน้า Profile สำหรับดูประวัติส่วนตัว (กำลังพัฒนา)");
-      switchView('home');
-    }
+    if(view === 'profile') { alert("ฟีเจอร์โปรไฟล์กำลังพัฒนา"); switchView('home'); }
   } else if(view === 'add') {
     document.getElementById('view-add').classList.remove('hidden');
     document.getElementById('navHome').classList.remove('active');
@@ -462,17 +477,14 @@ function getOwnerName(){
   const r = document.querySelector('input[name="owner"]:checked').value;
   return r === "Other" ? (document.getElementById("ownerCustom").value.trim() || "ไม่ระบุ") : r;
 }
-
 function getIconForCategory(cat) {
   const c = cat.toLowerCase();
-  if(c.includes("อาหาร") || c.includes("ข้าว")) return "🍔";
-  if(c.includes("ช้อป") || c.includes("shopee")) return "🛒";
-  if(c.includes("เดินทาง") || c.includes("น้ำมัน")) return "🚗";
-  if(c.includes("บิล") || c.includes("เน็ต")) return "📄";
+  if(c.includes("อาหาร") || c.includes("ข้าว")) return "🍔"; if(c.includes("ช้อป") || c.includes("shopee")) return "🛒";
+  if(c.includes("เดินทาง") || c.includes("น้ำมัน")) return "🚗"; if(c.includes("บิล") || c.includes("เน็ต")) return "📄";
   return "🏷️";
 }
 
-// --- Actions ---
+// --- Add Entry ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -488,7 +500,6 @@ async function addEntry(){
     const txNo = isTxVisible ? document.getElementById("txNo").value.trim() : "";
     
     if(!date||!item||!Number.isFinite(amount)||amount<=0){alert("กรุณากรอกข้อมูลให้ครบ");return;}
-    if(!db) { alert("ไม่มีการเชื่อมต่อฐานข้อมูล"); return; }
     
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
     const file = document.getElementById("entryImg").files[0];
@@ -512,9 +523,7 @@ let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
 function getStatusInfo(e) {
   const r = getRepaidSum(e); const rm = e.amount - r;
-  if(r === 0) return { rm, r };
-  if(rm <= 0) return { rm:0, r };
-  return { rm, r };
+  if(r === 0) return { rm, r }; if(rm <= 0) return { rm:0, r }; return { rm, r };
 }
 
 function openRepayModal(id){
@@ -523,8 +532,7 @@ function openRepayModal(id){
   document.getElementById("repayItemName").textContent = e.item;
   document.getElementById("repayRemainAmt").textContent = "฿" + money(st.rm);
   document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
-  document.getElementById("repayInputAmt").value = "";
-  document.getElementById("repayImg").value = "";
+  document.getElementById("repayInputAmt").value = ""; document.getElementById("repayImg").value = "";
   document.getElementById("repayModal").classList.add("open");
 }
 function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
@@ -549,13 +557,12 @@ async function confirmRepay(){
 
 function deleteRepay(eid, rid){
   if(confirm("ลบประวัติการโอน?")){
-    const e = entries.find(x => x.id === eid);
-    const updatedRepayments = e.repayments.filter(r => r.id !== rid);
+    const e = entries.find(x => x.id === eid); const updatedRepayments = e.repayments.filter(r => r.id !== rid);
     db.collection("entries").doc(eid).update({ repayments: updatedRepayments });
   }
 }
 
-// --- Render ---
+// --- Render Main List ---
 function render(){
   if(document.getElementById("cycleSelect").options.length === 0) refreshCycles();
   const k = document.getElementById("cycleSelect").value;
@@ -574,12 +581,12 @@ function render(){
 
     let hHtml = "";
     if(x.repayments && x.repayments.length > 0){
-      hHtml = `<div style="margin-top:12px; padding:10px; background:var(--bg); border-radius:12px;">
+      hHtml = `<div style="margin-top:12px; padding:10px; background:var(--bg); border-radius:12px; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);">
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:6px">ประวัติชำระคืน:</div>
         ${x.repayments.map(r => `
-          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--line); padding:6px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;">
             <div style="display:flex; align-items:center; gap:8px">
-              ${r.image ? `<img src="${r.image}" style="width:24px;height:24px;border-radius:6px;object-fit:cover" onclick="viewImage(this.src)">` : ''}
+              ${r.image ? `<img src="${r.image}" style="width:24px;height:24px;border-radius:6px;object-fit:cover;cursor:pointer" onclick="viewImage('${r.image}')">` : ''}
               <span style="font-size:12px; color:var(--text-muted)">${fmtDate(r.date)}</span>
             </div>
             <div>
@@ -594,7 +601,7 @@ function render(){
     const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
 
     return `<div class="entry-card">
-      <div class="entry-icon" ${x.image ? `onclick="viewImage('${x.image}')"` : ''}>
+      <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="viewImage('${x.image}')"` : ''}>
         ${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}
       </div>
       <div class="entry-details">
@@ -624,22 +631,87 @@ function render(){
   }).join("") : '<div class="split-badge"><span>ไม่มีข้อมูล</span><strong>฿0.00</strong></div>';
 }
 
+// --- Visual Report (สรุปตารางพร้อมรูป) ---
+function openVisualReport() {
+  const k = document.getElementById("cycleSelect").value;
+  if(!k) return alert("กรุณาเลือกรอบบิล");
+  document.getElementById("reportCycleLabel").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
+  
+  const es = entries.filter(x => keyFromDate(x.date) === k).sort((a,b)=>a.date.localeCompare(b.date));
+  
+  let html = `<table class="report-table">
+    <tr>
+      <th>วันที่</th>
+      <th>รายการ</th>
+      <th>ยอดเงิน</th>
+      <th>ผู้จ่าย</th>
+      <th>รูปสินค้า/สลิปจ่าย</th>
+      <th>สลิปโอนคืน</th>
+    </tr>`;
+    
+  es.forEach(x => {
+    let imgHtml = x.image ? `<img src="${x.image}" style="width:40px; height:40px; object-fit:cover; border-radius:8px; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.1)" onclick="viewImage('${x.image}')">` : '-';
+    let repayImgHtml = '';
+    if (x.repayments && x.repayments.length > 0) {
+      repayImgHtml = x.repayments.map(r => r.image ? `<img src="${r.image}" style="width:30px; height:30px; object-fit:cover; border-radius:4px; cursor:pointer; margin-right:4px; box-shadow:0 1px 3px rgba(0,0,0,0.1)" onclick="viewImage('${r.image}')">` : '').join('');
+    }
+    if(!repayImgHtml) repayImgHtml = '-';
+
+    html += `<tr>
+      <td>${fmtDate(x.date)}</td>
+      <td><strong>${esc(x.item)}</strong></td>
+      <td style="color:var(--primary-dark)"><strong>฿${money(x.amount)}</strong></td>
+      <td>${esc(x.owner)}</td>
+      <td style="text-align:center">${imgHtml}</td>
+      <td style="text-align:center">${repayImgHtml}</td>
+    </tr>`;
+  });
+  html += `</table>`;
+  if(es.length === 0) html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลในรอบบิลนี้</div>`;
+  
+  document.getElementById('reportContent').innerHTML = html;
+  document.getElementById('reportModal').classList.add('open');
+}
+function closeReportModal() { document.getElementById('reportModal').classList.remove('open'); }
+
+// --- Setting Modal ---
 function openSettings(){ document.getElementById("cutoffInput").value = localSettings.cutoffDay; document.getElementById("settingsModal").classList.add("open"); }
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
 function saveSettings(){ let c = Number(document.getElementById("cutoffInput").value); if(c<1||c>28){alert("ระบุ 1-28");return;} localSettings.cutoffDay = c; saveSettingsLocal(); closeSettings(); refreshCycles(); render(); }
 function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
 
-function exportExcel(){
+// --- CSV Export for Google Sheets ---
+function exportCSV(){
   try {
-    if(entries.length === 0) { alert("ไม่มีข้อมูล"); return; }
-    const rows = [["รอบบิล","วันที่","รายการ","ผู้จ่าย","ช่องทาง","หมวดหมู่","OrderNo","TxNo","ยอดเต็ม","จ่ายคืนแล้ว","ยอดค้าง","หมายเหตุ"]];
-    entries.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x => {
+    if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
+    
+    // Header ของ CSV
+    const headers = ["รอบบิล","วันที่","รายการ","ผู้จ่าย","ช่องทาง","หมวดหมู่","OrderNo","TxNo","ยอดเต็ม(บาท)","จ่ายคืนแล้ว(บาท)","ยอดค้าง(บาท)","หมายเหตุ"];
+    
+    // ใส่ \uFEFF BOM เพื่อให้ Google Sheets และ Excel อ่านภาษาไทยได้สมบูรณ์
+    let csvContent = "\uFEFF" + headers.join(",") + "\n";
+    
+    let exportEntries = entries.slice().sort((a,b)=>a.date.localeCompare(b.date));
+    exportEntries.forEach(x => {
       const st = getStatusInfo(x);
-      rows.push([cycleLabel(keyFromDate(x.date)), fmtDate(x.date), x.item, x.owner, x.method, x.category||"", x.orderNo||"-", x.transactionNo||"-", Number(x.amount), Number(st.r), Number(st.rm), x.note||""]);
+      let row = [
+        cycleLabel(keyFromDate(x.date)), 
+        fmtDate(x.date), 
+        `"${escCSV(x.item)}"`, 
+        `"${escCSV(x.owner)}"`, 
+        `"${escCSV(x.method)}"`, 
+        `"${escCSV(x.category)}"`, 
+        `"${escCSV(x.orderNo)}"`, 
+        `"${escCSV(x.transactionNo)}"`, 
+        x.amount, 
+        st.r, 
+        st.rm, 
+        `"${escCSV(x.note)}"`
+      ];
+      csvContent += row.join(",") + "\n";
     });
-    const detail = rows.map((r,i) => "<tr>"+r.map((v,j) => (j>=8 && j<=10 && i!==0)?`<td style="mso-number-format:'0.00'">${Number(v).toFixed(2)}</td>`:`<td>${String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</td>`).join("")+"</tr>").join("");
-    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"><style>table{border-collapse:collapse}th,td{border:1px solid #bbb;padding:6px}th{background:#8ab59b; color:#fff}</style></head><body><h2>รายงานค่าใช้จ่าย</h2><table>${detail}</table></body></html>`;
-    downloadBlob(new Blob(["\ufeff",doc], {type:"application/vnd.ms-excel;charset=utf-8"}), "expense-export.xls");
+    
+    downloadBlob(new Blob([csvContent], {type:"text/csv;charset=utf-8;"}), "expense-export.csv");
   } catch (err) { alert("ผิดพลาด: " + err.message); }
 }
 
