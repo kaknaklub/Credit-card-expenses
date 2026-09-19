@@ -95,7 +95,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .entry-card { 
   background: var(--surface-white); border-radius: 18px; padding: 14px; margin-bottom: 14px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; gap: 12px; align-items: center;
-  transition: transform 0.2s;
+  transition: transform 0.2s; position: relative;
 }
 .entry-card:active { transform: scale(0.98); }
 .entry-icon { 
@@ -110,10 +110,14 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .entry-meta { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
 .badge { font-size: 9.5px; padding: 2px 6px; border-radius: 5px; font-weight: 600; background: var(--bg); color: var(--primary-dark); }
 .badge-installment { background: #eef5f0; color: #437a54; border: 1px dashed var(--primary); }
-.entry-right { text-align: right; flex-shrink: 0; }
+.entry-right { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .entry-right h4 { margin: 0 0 3px; font-size: 15px; font-weight: 700; color: var(--text-main); }
 .entry-right p { margin: 0; font-size: 11px; font-weight: 600; }
 .c-red { color: var(--danger) !important; } .c-green { color: var(--primary) !important; }
+
+/* Delete Icon Button */
+.btn-delete-item { background: transparent; border: none; color: var(--danger); font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; transition: 0.2s; }
+.btn-delete-item:hover { background: #ffebeb; }
 
 /* Form Inputs */
 .input-group { margin-bottom: 16px; }
@@ -275,7 +279,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
     <div class="input-group"><label>รายการ / สินค้า</label><input id="item" type="text" placeholder="เช่น ค่ากาแฟ, Shopee..."></div>
-    <div class="input-group"><label>ยอดเงินเต็ม (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
 
     <div class="input-group">
       <label>ใครเป็นคนจ่าย / ของใคร?</label>
@@ -321,10 +325,27 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       </div>
     </div>
 
-    <!-- ฟอร์มตั้งค่าผ่อนชำระ (ซ่อนไว้จนกว่าจะเลือกผ่อน) -->
+    <!-- ฟอร์มตั้งค่าผ่อนชำระ (รองรับทั้งระบุ % หรือระบุยอดดอกเบี้ยเป็นบาทตรงๆ) -->
     <div id="addInstallmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
-      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="10"></div>
-      <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%) (ถ้ามี)</label><input id="addInterest" type="number" min="0" step="0.01" value="0" placeholder="0"></div>
+      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="5"></div>
+      
+      <div class="input-group">
+        <label>รูปแบบการคิดดอกเบี้ย</label>
+        <div class="radio-segments">
+          <label><input type="radio" name="interestType" value="percent" checked onchange="toggleInterestInput()"><span>ระบุ % ต่อปี</span></label>
+          <label><input type="radio" name="interestType" value="baht" onchange="toggleInterestInput()"><span>ระบุยอดดอกเบี้ย (บาท)</span></label>
+        </div>
+      </div>
+
+      <div class="input-group" id="interestPercentContainer">
+        <label>อัตราดอกเบี้ยต่อปี (%)</label>
+        <input id="addInterestPercent" type="number" min="0" step="0.01" value="0" placeholder="เช่น 15">
+      </div>
+      <div class="input-group hidden" id="interestBahtContainer">
+        <label>ยอดดอกเบี้ยรวมตลอดสัญญา (บาท)</label>
+        <input id="addInterestBaht" type="number" min="0" step="0.01" value="0" placeholder="เช่น 50">
+      </div>
+
       <div class="input-group" style="margin-bottom:0;"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="addStartDate" type="date"></div>
     </div>
 
@@ -397,7 +418,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
     <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="convertInstItemName">-</div>
     
     <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="ciMonths" type="number" min="2" max="60" value="10"></div>
-    <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%) (ถ้ามี)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0" placeholder="0"></div>
+    <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0" placeholder="0"></div>
     <div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="ciStartDate" type="date"></div>
 
     <button class="btn-main" style="margin-top:10px;" onclick="confirmConvertToInstallment()">ยืนยันสร้างตารางผ่อน</button>
@@ -614,9 +635,8 @@ async function scanReceiptWithAI(input) {
   
   try {
     const compressedB64 = await compressImage(file);
-    document.getElementById('entryImg').files = input.files; // แนบรูปเข้าฟอร์มหลักด้วย
+    document.getElementById('entryImg').files = input.files;
     
-    // ใช้ Tesseract อ่านข้อความภาษาไทยและอังกฤษแบบออฟไลน์/ฟรี
     const result = await Tesseract.recognize(file, 'tha+eng', {
       logger: m => console.log(m)
     });
@@ -624,7 +644,6 @@ async function scanReceiptWithAI(input) {
     const text = result.data.text;
     console.log("OCR Extracted Text:", text);
     
-    // ค้นหายอดเงินด้วย Regular Expression (เช่น 1,234.50 หรือ 500.00)
     const moneyRegex = /\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g;
     const matches = text.match(moneyRegex);
     if(matches && matches.length > 0) {
@@ -633,7 +652,6 @@ async function scanReceiptWithAI(input) {
       document.getElementById('amount').value = maxAmount;
     }
     
-    // ค้นหาวันที่รูปแบบ YYYY-MM-DD หรือ DD/MM/YYYY
     const dateRegex = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/;
     const dateMatch = text.match(dateRegex);
     if(dateMatch) {
@@ -647,7 +665,6 @@ async function scanReceiptWithAI(input) {
       document.getElementById('addStartDate').value = parsedDateStr;
     }
     
-    // ตรวจจับคำว่า "ผ่อน" หรือ "Installment" เพื่อสลับเป็นโหมดผ่อนให้อัตโนมัติถ้าเจอ
     if(text.toLowerCase().includes("ผ่อน") || text.toLowerCase().includes("installment") || text.toLowerCase().includes("งวด")) {
       document.querySelector('input[name="txType"][value="installment"]').checked = true;
       toggleTxType();
@@ -724,6 +741,11 @@ function toggleTxType(){
   const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
   document.getElementById("addInstallmentBox").classList.toggle('hidden', !isInst);
 }
+function toggleInterestInput(){
+  const isBaht = document.querySelector('input[name="interestType"]:checked').value === "baht";
+  document.getElementById("interestPercentContainer").classList.toggle('hidden', isBaht);
+  document.getElementById("interestBahtContainer").classList.toggle('hidden', !isBaht);
+}
 function toggleTxNo(){
   const m = document.getElementById("method").value.toLowerCase(); const c = document.getElementById("category").value.toLowerCase();
   const isOnline = m.includes("shopee") || m.includes("spaylater") || m.includes("lazada") || c.includes("shopee") || c.includes("ออนไลน์");
@@ -741,7 +763,7 @@ function getIconForCategory(cat) {
   return "🏷️";
 }
 
-// --- Add Entry (Supports Direct Installments) ---
+// --- Add Entry (Supports Direct Installments & Baht/Percent Interest Conversion) ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -770,19 +792,30 @@ async function addEntry(){
     };
 
     if (isInst) {
-      const months = Number(document.getElementById("addMonths").value) || 10;
-      const annualInterest = Number(document.getElementById("addInterest").value) || 0;
-      const startDateStr = document.getElementById("addStartDate").value || date;
+      const months = Number(document.getElementById("addMonths").value) || 5;
+      const intType = document.querySelector('input[name="interestType"]:checked').value;
       
-      let totalToPay = amount;
-      if(annualInterest > 0) {
-        let totalInterest = amount * (annualInterest / 100) * (months / 12);
-        totalToPay = amount + totalInterest;
+      let totalInterest = 0;
+      let annualInterest = 0;
+
+      if(intType === 'baht') {
+        let interestBaht = Number(document.getElementById("addInterestBaht").value) || 0;
+        totalInterest = interestBaht;
+        // คำนวณแปลงยอดดอกเบี้ยบาทให้เป็นเปอร์เซ็นต์ต่อปีอัตโนมัติเพื่อให้ระบบนำไปคำนวณต่อได้สมบูรณ์
+        if (amount > 0 && months > 0) {
+          let perYearFraction = (interestBaht / amount) * (12 / months);
+          annualInterest = Number((perYearFraction * 100).toFixed(2));
+        }
+      } else {
+        annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
+        totalInterest = amount * (annualInterest / 100) * (months / 12);
       }
+
+      let totalToPay = amount + totalInterest;
       let perMonth = totalToPay / months;
       
       let schedules = [];
-      let [y, m, d] = startDateStr.split("-").map(Number);
+      let [y, m, d] = (document.getElementById("addStartDate").value || date).split("-").map(Number);
       
       for(let i=1; i<=months; i++) {
         let payDateObj = new Date(y, m - 1 + (i - 1), d);
@@ -817,31 +850,18 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-// --- Long Press Delete Handler ---
-function setupLongPress(element, id) {
-  let timer = null;
-  const startPress = (e) => {
-    if(e.target.tagName === 'IMG' || e.target.tagName === 'SPAN' || e.target.tagName === 'P') return;
-    timer = setTimeout(() => {
-      if(confirm("⚠️ คุณต้องการลบรายการนี้ใช่หรือไม่?")) {
-        db.collection("entries").doc(id).delete();
-      }
-    }, 800);
-  };
-  const cancelPress = () => { if(timer) clearTimeout(timer); };
-  
-  element.addEventListener("mousedown", startPress);
-  element.addEventListener("mouseup", cancelPress);
-  element.addEventListener("mouseleave", cancelPress);
-  element.addEventListener("touchstart", startPress);
-  element.addEventListener("touchend", cancelPress);
+// --- Delete Handler with Icon & Confirmation Dialog ---
+function deleteEntry(id) {
+  if(confirm("⚠️ คุณต้องการลบรายการนี้ออกจากระบบ Cloud ใช่หรือไม่?")) {
+    db.collection("entries").doc(id).delete().catch(err => alert("ลบไม่สำเร็จ: " + err.message));
+  }
 }
 
 // --- แปลงรายการเก่าเป็นผ่อนชำระ ---
 function openConvertInstModal(id) {
   const e = entries.find(x => x.id === id); if(!e) return;
   document.getElementById("convertEntryId").value = id;
-  document.getElementById("convertInstItemName").textContent = `${e.item} (ยอดเต็ม: ฿${money(e.amount)})`;
+  document.getElementById("convertInstItemName").textContent = `${e.item} (ยอดซื้อ: ฿${money(e.amount)})`;
   const now = new Date();
   document.getElementById("ciStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById("convertInstModal").classList.add("open");
@@ -856,11 +876,8 @@ async function confirmConvertToInstallment() {
   const annualInterest = Number(document.getElementById("ciInterest").value) || 0;
   const startDateStr = document.getElementById("ciStartDate").value || e.date;
   
-  let totalToPay = e.amount;
-  if(annualInterest > 0) {
-    let totalInterest = e.amount * (annualInterest / 100) * (months / 12);
-    totalToPay = e.amount + totalInterest;
-  }
+  let totalInterest = e.amount * (annualInterest / 100) * (months / 12);
+  let totalToPay = e.amount + totalInterest;
   let perMonth = totalToPay / months;
   
   let schedules = [];
@@ -1293,16 +1310,12 @@ function render(){
         ${hHtml}
       </div>
       <div class="entry-right">
+        <button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button>
         <h4>฿${money(eff.amount)}</h4>
         ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
       </div>
     </div>`;
   }).join("") : `<div style="text-align:center; padding: 40px 20px; color: var(--text-muted); font-size:13.5px">ยังไม่มีรายการค่าใช้จ่ายในรอบบิลนี้<br><br>กดปุ่ม + ด้านล่างเพื่อเริ่มบันทึกเลย! 🌿</div>`;
-
-  es.forEach(x => {
-    const cardEl = document.getElementById(`card-${x.id}`);
-    if(cardEl) setupLongPress(cardEl, x.id);
-  });
 
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
   
@@ -1373,7 +1386,7 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์ Excel สไตล์พรีเมียมด้วย SheetJS (พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน และแยกวันที่งวดผ่อน) ---
+// --- ส่งออกไฟล์ Excel สไตล์พรีเมียมด้วย SheetJS (พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน และแสดง % ดอกเบี้ย) ---
 function exportStyledExcelWithSheetJS() {
   if (entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
@@ -1417,7 +1430,6 @@ function exportStyledExcelWithSheetJS() {
     }
   });
 
-  // เรียงลำดับวันที่จากอดีตไปปัจจุบัน (เดือน 9 ขึ้นก่อนเดือน 10)
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
   let wsData = [
@@ -1500,7 +1512,7 @@ function setup(){
   const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   document.getElementById("date").value = dateStr;
   document.getElementById("addStartDate").value = dateStr;
-  toggleOwnerInput(); toggleTxNo(); toggleTxType();
+  toggleOwnerInput(); toggleTxNo(); toggleTxType(); toggleInterestInput();
 }
 setup();
 </script>
