@@ -453,7 +453,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
   </div>
 </div>
 
-<!-- Modal: Settings (ตั้งค่ารอบบิล & วันกำหนดจ่าย แยกรายช่องทาง) -->
+<!-- Modal: Settings -->
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()">
   <div class="sheet">
     <div class="grabber"></div>
@@ -1238,46 +1238,60 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์ CSV รองรับทั้ง PC และ Mobile พร้อมรายละเอียดผ่อนและดอกเบี้ย ---
+// --- ส่งออกไฟล์ CSV (ปรับวันที่ให้เป็นวันที่ของงวดผ่อนจริงตามที่คุณต้องการ) ---
 function exportStyledCSV() {
   if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
+  
+  // กรองรายการที่อยู่ในรอบบิลนี้
   const es = entries.filter(x => {
     let m = x.method || "CreditCard";
     return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : keyFromDateForMethod(x.date, m) === k;
   }).sort((a,b)=>a.date.localeCompare(b.date));
   
   let csvRows = [];
-  // Header
+  // Header ชัดเจน
   csvRows.push(["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"].map(field => `"${field}"`).join(","));
 
   es.forEach(x => {
-    const eff = getEffectiveItemData(x, k);
-    let itemName = x.item;
-
-    // ถ้าเป็นรายการผ่อนชำระ ให้เพิ่มรายละเอียดงวดและดอกเบี้ยต่อท้ายชื่อรายการ
-    if (x.isInstallment && x.installmentPlan) {
-      let m = x.method || "CreditCard";
-      let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k);
-      let periodNo = matchedS ? matchedS.no : 1;
-      let totalMonths = x.installmentPlan.months;
-      let interestRate = x.installmentPlan.annualInterest || 0;
-      itemName += ` [ผ่อนชำระ งวดที่ ${periodNo}/${totalMonths} | ดอกเบี้ย ${interestRate}% ต่อปี]`;
+    let m = x.method || "CreditCard";
+    
+    // สำคัญ: หากเป็นรายการผ่อน ให้ดึงเฉพาะวันที่กำหนดชำระ (dueDate) ของงวดที่ตรงกับรอบบิลนี้มาแสดง
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === k);
+      
+      matchingSchedules.forEach(s => {
+        let itemName = `${x.item} [ผ่อนชำระ งวดที่ ${s.no}/${x.installmentPlan.months} | ดอกเบี้ย ${x.installmentPlan.annualInterest || 0}% ต่อปี]`;
+        let row = [
+          fmtDate(s.dueDate), // 👈 ใช้ "วันที่ของงวดผ่อน" ตามที่คุณต้องการเป๊ะๆ
+          itemName,
+          x.owner,
+          x.method,
+          x.category,
+          Number(s.amount).toFixed(2),
+          s.paid ? Number(s.amount).toFixed(2) : "0.00",
+          s.paid ? "0.00" : Number(s.amount).toFixed(2),
+          x.note || ""
+        ];
+        csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
+      });
+      
+    } else {
+      // รายการปกติทั่วไป
+      const eff = getEffectiveItemData(x, k);
+      let row = [
+        fmtDate(x.date),
+        x.item,
+        x.owner,
+        x.method,
+        x.category,
+        Number(eff.amount).toFixed(2),
+        Number(eff.repaid).toFixed(2),
+        Number(eff.remain).toFixed(2),
+        x.note || ""
+      ];
+      csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
     }
-
-    let row = [
-      fmtDate(x.date),
-      itemName,
-      x.owner,
-      x.method,
-      x.category,
-      Number(eff.amount).toFixed(2),
-      Number(eff.repaid).toFixed(2),
-      Number(eff.remain).toFixed(2),
-      x.note || ""
-    ];
-
-    csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
   });
 
   const csvString = csvRows.join("\r\n");
