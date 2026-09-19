@@ -125,17 +125,17 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
     <!-- ส่วนนำเข้า JSON จาก Gemini -->
     <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')">
-      ✨ <strong>วางข้อมูล JSON จาก Gemini (คำนวณอัตโนมัติ)</strong><br>
+      ✨ <strong>วางข้อมูล JSON จาก Gemini (นำเข้าแม่นยำ ไม่มั่วนิ่มดอกเบี้ย)</strong><br>
       <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด นำเข้าข้อมูลและคำนวณลงฟอร์ม</span>
     </div>
     <div id="jsonImportBox" class="hidden" style="margin-bottom: 16px; background: var(--surface-white); padding: 14px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
       <textarea id="jsonImportData" rows="6" style="width: 100%; border-radius: 14px; padding: 10px; border: 1px solid var(--shadow-dark); box-shadow: inset 2px 2px 5px var(--shadow-dark); font-size:12px; font-family:monospace;" placeholder='วางโค้ด JSON ที่ก๊อปปี้มาจากแอป Gemini ลงตรงนี้...'></textarea>
-      <button class="btn-main" style="margin-top: 10px; padding: 12px; font-size: 14px;" onclick="importJSON()">⬇️ ดึงข้อมูลและคำนวณใส่ฟอร์ม</button>
+      <button class="btn-main" style="margin-top: 10px; padding: 12px; font-size: 14px;" onclick="importJSON()">⬇️ ดึงข้อมูลและใส่ฟอร์ม</button>
     </div>
 
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
     <div class="input-group"><label>รายการ / สินค้า</label><input id="item" type="text" placeholder="เช่น ค่ากาแฟ, Shopee..."></div>
-    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="หากไม่ทราบ ปล่อยว่างไว้ได้ระบบจะคำนวณให้"></div>
+    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
 
     <div class="input-group">
       <label>ใครเป็นคนจ่าย / ของใคร?</label>
@@ -244,7 +244,7 @@ let entries = [];
 let userChangedCycle = false;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
 
-// 🌟 ฟังก์ชันนำเข้า JSON ฉบับสมบูรณ์
+// 🌟 ฟังก์ชันนำเข้า JSON ฉบับแก้ไข: ไม่อุปโลกน์ดอกเบี้ย หากบิลไม่มีดอกเบี้ย
 function importJSON() {
   try {
     const rawData = document.getElementById('jsonImportData').value.trim();
@@ -290,28 +290,18 @@ function importJSON() {
       let principal = 0;
       let calculatedInterestBaht = 0;
 
-      if ((!data.amount || data.amount <= 0) && data.perMonth && data.addMonths) {
-        let totalSum = data.perMonth * data.addMonths;
-        if (data.interestBaht && data.interestBaht > 0) {
-          calculatedInterestBaht = data.interestBaht;
-          principal = totalSum - calculatedInterestBaht;
-        } else if (data.totalToPay && data.totalToPay > 0) {
-          calculatedInterestBaht = data.totalToPay - (data.totalToPay / (1 + (data.annualInterest || 0)/100));
-          principal = data.totalToPay - (data.interestBaht || calculatedInterestBaht);
-        } else {
-          principal = totalSum * 0.95;
-          calculatedInterestBaht = totalSum - principal;
-        }
+      // เช็คว่ามีดอกเบี้ยหรือไม่ ถ้าใน JSON ส่งดอกเบี้ยมาเป็น 0 หรือไม่ส่ง ให้ดอกเบี้ยเป็น 0 ทันที
+      if (data.interestBaht !== undefined && data.interestBaht > 0) {
+        calculatedInterestBaht = data.interestBaht;
+        principal = (data.amount || (data.perMonth * data.addMonths)) - calculatedInterestBaht;
+      } else if (data.annualInterest !== undefined && data.annualInterest > 0) {
+        let totalSum = data.perMonth ? (data.perMonth * data.addMonths) : (data.amount || 0);
+        calculatedInterestBaht = totalSum * (data.annualInterest / 100) * (data.addMonths / 12);
+        principal = totalSum - calculatedInterestBaht;
       } else {
-        principal = data.amount || 0;
-        if (data.interestBaht !== undefined && data.interestBaht > 0) {
-          calculatedInterestBaht = data.interestBaht;
-        } else if (data.totalToPay !== undefined && principal > 0 && data.totalToPay > principal) {
-          calculatedInterestBaht = data.totalToPay - principal;
-        } else if (data.perMonth !== undefined && principal > 0 && data.addMonths > 0) {
-          let totalSum = data.perMonth * data.addMonths;
-          if (totalSum > principal) calculatedInterestBaht = totalSum - principal;
-        }
+        // กรณีไม่มีดอกเบี้ย (เช่น SPayLater 0%) ดอกเบี้ยเป็น 0, เงินต้น = ยอดรวมทั้งหมด
+        calculatedInterestBaht = 0;
+        principal = data.amount || (data.perMonth ? data.perMonth * data.addMonths : 0);
       }
 
       document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : "";
@@ -320,10 +310,10 @@ function importJSON() {
         document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
         toggleInterestInput();
         document.getElementById('addInterestBaht').value = calculatedInterestBaht.toFixed(2);
-      } else if (data.annualInterest !== undefined && data.annualInterest > 0) {
-        document.querySelector(`input[name="interestType"][value="percent"]`).checked = true;
+      } else {
+        document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
         toggleInterestInput();
-        document.getElementById('addInterestPercent').value = data.annualInterest;
+        document.getElementById('addInterestBaht').value = "0";
       }
     } else {
       document.querySelector(`input[name="txType"][value="normal"]`).checked = true;
@@ -332,7 +322,7 @@ function importJSON() {
     }
 
     toggleTxNo();
-    alert("✅ นำเข้าข้อมูลและคำนวณเงินต้น/ดอกเบี้ยสำเร็จ!");
+    alert("✅ นำเข้าข้อมูลสำเร็จ (ไม่มีการคำนวณดอกเบี้ยเกินจริง)");
     document.getElementById('jsonImportData').value = "";
     document.getElementById('jsonImportBox').classList.add('hidden');
     
@@ -342,7 +332,6 @@ function importJSON() {
   }
 }
 
-// 🌟 ฟังก์ชันบันทึกรายการ (ปรับปรุงใหม่: คำนวณเงินต้นอัตโนมัติหากไม่กรอก)
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -360,7 +349,6 @@ async function addEntry(){
     
     const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
 
-    // หากเป็นรายการผ่อน แล้วไม่ได้กรอกช่อง "ยอดเงินซื้อสินค้า" แต่กรอก "ยอดผ่อนต่องวด" ไว้ ให้ระบบคำนวณเงินต้นให้
     if(isInst && (!Number.isFinite(amount) || amount <= 0)) {
       const months = Number(document.getElementById("addMonths").value) || 0;
       const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0;
@@ -368,20 +356,14 @@ async function addEntry(){
       
       if(months > 0 && customPerMonth > 0) {
         let totalSum = customPerMonth * months;
-        let interestBaht = 0;
-        if(intType === 'baht') {
-          interestBaht = Number(document.getElementById("addInterestBaht").value) || 0;
-        } else {
-          let annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
-          interestBaht = (totalSum * (annualInterest / 100) * (months / 12)) / (1 + (annualInterest / 100) * (months / 12)); // ประมาณการ
-        }
+        let interestBaht = intType === 'baht' ? (Number(document.getElementById("addInterestBaht").value) || 0) : 0;
         amount = totalSum - interestBaht;
         document.getElementById("amount").value = amount.toFixed(2);
       }
     }
 
     if(!date || !item || !Number.isFinite(amount) || amount <= 0){ 
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน (หรือระบุยอดผ่อนต่องวดเพื่อให้ระบบคำนวณเงินต้น)"); 
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน"); 
       return; 
     }
 
@@ -398,9 +380,11 @@ async function addEntry(){
       let totalInterest = 0; let annualInterest = 0;
 
       if(intType === 'baht') {
-        let interestBaht = Number(document.getElementById("addInterestBaht").value) || 0; totalInterest = interestBaht;
-        if (amount > 0 && months > 0) { let perYearFraction = (interestBaht / amount) * (12 / months); annualInterest = Number((perYearFraction * 100).toFixed(2)); }
-      } else { annualInterest = Number(document.getElementById("addInterestPercent").value) || 0; totalInterest = amount * (annualInterest / 100) * (months / 12); }
+        totalInterest = Number(document.getElementById("addInterestBaht").value) || 0;
+      } else {
+        annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
+        totalInterest = amount * (annualInterest / 100) * (months / 12);
+      }
       
       let totalToPay = amount + totalInterest; 
       let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); 
