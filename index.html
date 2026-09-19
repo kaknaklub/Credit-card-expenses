@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.6</title>
+<title>Credit Card & Loan Master Pro V2.7</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -90,7 +90,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.6</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.7</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -106,8 +106,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
         <span>▼</span>
       </button>
 
-      <!-- ส่วนสรุปยอดใช้งบ & หมวดหมู่ (อัปเดตให้แสดงยอดใช้จ่ายรวมชัดเจน) -->
-      <div style="background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px;" onclick="openAnalyticsModal()" style="cursor:pointer;">
+      <!-- ส่วนสรุปยอดใช้งบ & หมวดหมู่ -->
+      <div style="background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px; cursor: pointer;" onclick="openAnalyticsModal()">
         <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; opacity: 0.95;">
           <span>📊 สรุปยอดใช้งบ & หมวดหมู่</span>
           <span style="text-decoration:underline; font-size:11px;">ดูสถิติเชิงลึก ▶</span>
@@ -379,7 +379,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.6")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.7")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
@@ -456,7 +456,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.6`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.7`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -683,7 +683,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.6", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.7", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1261,7 +1261,7 @@ function render(){
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
                 </div>
-              `;
+              </div>`;
     }).join("");
   } else {
     entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
@@ -1292,7 +1292,7 @@ function render(){
   let percent = budgetLimit > 0 ? Math.min(100, (totalSpentInCycle / budgetLimit) * 100) : 0;
   
   document.getElementById("budgetText").textContent = budgetLimit > 0 ? "฿" + money(budgetLimit) : "ยังไม่ตั้ง"; 
-  document.getElementById("cycleSpentText").textContent = "฿" + money(totalSpentInCycle); // แสดงยอดใช้งบรวมรอบนี้ชัดเจน
+  document.getElementById("cycleSpentText").textContent = "฿" + money(totalSpentInCycle); 
   document.getElementById("budgetRemainText").textContent = budgetLimit > 0 ? "฿" + money(budgetRemain) : "฿0.00"; 
   document.getElementById("budgetProgressBar").style.width = percent + "%";
 }
