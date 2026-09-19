@@ -1238,60 +1238,83 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์ CSV (ปรับวันที่ให้เป็นวันที่ของงวดผ่อนจริงตามที่คุณต้องการ) ---
+// --- ส่งออกไฟล์ CSV พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน (เดือน 9 ขึ้นก่อนเดือน 10) ---
 function exportStyledCSV() {
   if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
   
-  // กรองรายการที่อยู่ในรอบบิลนี้
-  const es = entries.filter(x => {
+  // รวบรวมรายการทั้งหมดที่จะออกรายงานในรอบบิลนี้ (ทั้งปกติและตารางผ่อน)
+  let flatList = [];
+
+  entries.forEach(x => {
     let m = x.method || "CreditCard";
-    return x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : keyFromDateForMethod(x.date, m) === k;
-  }).sort((a,b)=>a.date.localeCompare(b.date));
-  
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => {
+        if (keyFromDateForMethod(s.dueDate, m) === k) {
+          flatList.push({
+            date: s.dueDate, // ใช้วันที่กำหนดจ่ายงวดจริง
+            rawItem: x,
+            isInst: true,
+            schedule: s,
+            sortDate: s.dueDate
+          });
+        }
+      });
+    } else {
+      if (keyFromDateForMethod(x.date, m) === k) {
+        flatList.push({
+          date: x.date,
+          rawItem: x,
+          isInst: false,
+          sortDate: x.date
+        });
+      }
+    }
+  });
+
+  // เรียงลำดับวันที่จากอดีตไปปัจจุบัน (Ascending: เก่าไปใหม่ -> เดือน 9 ก่อนเดือน 10)
+  flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+
   let csvRows = [];
-  // Header ชัดเจน
+  // Header
   csvRows.push(["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"].map(field => `"${field}"`).join(","));
 
-  es.forEach(x => {
-    let m = x.method || "CreditCard";
-    
-    // สำคัญ: หากเป็นรายการผ่อน ให้ดึงเฉพาะวันที่กำหนดชำระ (dueDate) ของงวดที่ตรงกับรอบบิลนี้มาแสดง
-    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === k);
-      
-      matchingSchedules.forEach(s => {
-        let itemName = `${x.item} [ผ่อนชำระ งวดที่ ${s.no}/${x.installmentPlan.months} | ดอกเบี้ย ${x.installmentPlan.annualInterest || 0}% ต่อปี]`;
-        let row = [
-          fmtDate(s.dueDate), // 👈 ใช้ "วันที่ของงวดผ่อน" ตามที่คุณต้องการเป๊ะๆ
-          itemName,
-          x.owner,
-          x.method,
-          x.category,
-          Number(s.amount).toFixed(2),
-          s.paid ? Number(s.amount).toFixed(2) : "0.00",
-          s.paid ? "0.00" : Number(s.amount).toFixed(2),
-          x.note || ""
-        ];
-        csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
-      });
-      
+  flatList.forEach(item => {
+    let x = item.rawItem;
+    let rowDate = "";
+    let itemName = x.item;
+    let amount = 0;
+    let repaid = 0;
+    let remain = 0;
+
+    if (item.isInst) {
+      let s = item.schedule;
+      rowDate = fmtDate(s.dueDate);
+      itemName += ` [ผ่อนชำระ งวดที่ ${s.no}/${x.installmentPlan.months} | ดอกเบี้ย ${x.installmentPlan.annualInterest || 0}% ต่อปี]`;
+      amount = s.amount;
+      repaid = s.paid ? s.amount : 0;
+      remain = s.paid ? 0 : s.amount;
     } else {
-      // รายการปกติทั่วไป
       const eff = getEffectiveItemData(x, k);
-      let row = [
-        fmtDate(x.date),
-        x.item,
-        x.owner,
-        x.method,
-        x.category,
-        Number(eff.amount).toFixed(2),
-        Number(eff.repaid).toFixed(2),
-        Number(eff.remain).toFixed(2),
-        x.note || ""
-      ];
-      csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
+      rowDate = fmtDate(x.date);
+      amount = eff.amount;
+      repaid = eff.repaid;
+      remain = eff.remain;
     }
+
+    let row = [
+      rowDate,
+      itemName,
+      x.owner,
+      x.method,
+      x.category,
+      Number(amount).toFixed(2),
+      Number(repaid).toFixed(2),
+      Number(remain).toFixed(2),
+      x.note || ""
+    ];
+
+    csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
   });
 
   const csvString = csvRows.join("\r\n");
