@@ -458,72 +458,74 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html + `</table>`;
 }
 
-// 🌟 ฟังก์ชันส่งออก CSV อัพสเกล (ดึงข้อมูลทุกอย่างในระบบ ทุกรอบบิล พร้อมรายละเอียดการผ่อนชำระ)
+// 🌟 ฟังก์ชันส่งออก CSV เฉพาะรอบบิลที่เลือก พร้อมรายละเอียดการผ่อนชำระ
 function exportToCSV() {
-  if (entries.length === 0) { alert("ไม่มีข้อมูล"); return; } 
+  const k = document.getElementById("cycleSelect").value;
+  if (!k) { alert("กรุณาเลือกรอบบิลก่อนครับ"); return; }
+  
   let flatList = [];
   
   entries.forEach(x => { 
     let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      // คำนวณดอกเบี้ย
-      let principal = Number(x.amount) || 0;
-      let totalToPay = Number(x.installmentPlan.totalToPay) || 0;
-      let totalInterest = totalToPay - principal;
-      if (totalInterest < 0) totalInterest = 0;
-      
-      // ข้อความรายละเอียดผ่อนชำระที่จะนำไปต่อท้าย
-      let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${x.installmentPlan.annualInterest}%, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
-
+      // ตรวจสอบว่างวดใดบ้างที่ตรงกับรอบบิลที่เลือกอยู่ปัจจุบัน
       x.installmentPlan.schedules.forEach(s => { 
-        let cycleKey = keyFromDateForMethod(s.dueDate, m);
+        if (keyFromDateForMethod(s.dueDate, m) === k) {
+          let principal = Number(x.amount) || 0;
+          let totalToPay = Number(x.installmentPlan.totalToPay) || 0;
+          let totalInterest = totalToPay - principal;
+          if (totalInterest < 0) totalInterest = 0;
+          
+          let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${x.installmentPlan.annualInterest}%, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
+
+          flatList.push({ 
+            sortDate: s.dueDate, 
+            date: fmtDate(s.dueDate), 
+            item: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})${instText}`, 
+            owner: x.owner, 
+            method: x.method, 
+            category: x.category, 
+            amount: Number(s.amount), 
+            repaid: s.paid ? Number(s.amount) : 0, 
+            remain: s.paid ? 0 : Number(s.amount),
+            orderNo: x.orderNo || "-",
+            txNo: x.transactionNo || "-",
+            note: x.note || "" 
+          }); 
+        }
+      });
+    } else {
+      if (keyFromDateForMethod(x.date, m) === k) {
+        let eff = getEffectiveItemData(x, k);
         flatList.push({ 
-          cycle: cycleKey,
-          sortDate: s.dueDate, 
-          date: fmtDate(s.dueDate), 
-          item: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})${instText}`, 
+          sortDate: x.date, 
+          date: fmtDate(x.date), 
+          item: x.item, 
           owner: x.owner, 
           method: x.method, 
           category: x.category, 
-          amount: Number(s.amount), 
-          repaid: s.paid ? Number(s.amount) : 0, 
-          remain: s.paid ? 0 : Number(s.amount),
+          amount: Number(eff.amount), 
+          repaid: Number(eff.repaid), 
+          remain: Number(eff.remain),
           orderNo: x.orderNo || "-",
           txNo: x.transactionNo || "-",
           note: x.note || "" 
         }); 
-      });
-    } else {
-      let cycleKey = keyFromDateForMethod(x.date, m);
-      let r = getRepaidSum(x);
-      let rm = x.amount - r;
-      flatList.push({ 
-        cycle: cycleKey,
-        sortDate: x.date, 
-        date: fmtDate(x.date), 
-        item: x.item, 
-        owner: x.owner, 
-        method: x.method, 
-        category: x.category, 
-        amount: Number(x.amount), 
-        repaid: Number(r), 
-        remain: Number(rm > 0 ? rm : 0),
-        orderNo: x.orderNo || "-",
-        txNo: x.transactionNo || "-",
-        note: x.note || "" 
-      }); 
+      }
     }
   });
 
-  // เรียงลำดับวันที่จากอดีตไปอนาคต
+  if (flatList.length === 0) { alert("ไม่มีข้อมูลในรอบบิลนี้ครับ"); return; }
+
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
-  // สร้างข้อมูล CSV (ใส่ BOM เพื่อให้ Excel อ่านภาษาไทยได้สมบูรณ์)
   let csvContent = "\uFEFF";
-  csvContent += "รอบบิล,วันที่,รายการ,ผู้จ่าย,ช่องทาง,หมวดหมู่,ยอดต่องวด (บาท),จ่ายคืนแล้ว (บาท),ค้างชำระ (บาท),Order No.,Transaction No.,หมายเหตุ\n";
+  csvContent += "รอบบิลที่เลือก,วันที่,รายการ,ผู้จ่าย,ช่องทาง,หมวดหมู่,ยอดต่องวด (บาท),จ่ายคืนแล้ว (บาท),ค้างชำระ (บาท),Order No.,Transaction No.,หมายเหตุ\n";
+
+  let cycleDisplay = cycleLabel(k);
 
   flatList.forEach(r => { 
-    // ป้องกันปัญหาการตัดคอลัมน์ผิดพลาดหากมีเครื่องหมาย , ภายในข้อความ
+    let cycleSafe = `"${cycleDisplay.replace(/"/g, '""')}"`;
     let itemSafe = `"${(r.item || "").replace(/"/g, '""')}"`;
     let ownerSafe = `"${(r.owner || "").replace(/"/g, '""')}"`;
     let methodSafe = `"${(r.method || "").replace(/"/g, '""')}"`;
@@ -533,7 +535,7 @@ function exportToCSV() {
     let txSafe = `"${(r.txNo || "").replace(/"/g, '""')}"`;
 
     let row = [
-      r.cycle,
+      cycleSafe,
       r.date,
       itemSafe,
       ownerSafe,
@@ -549,16 +551,11 @@ function exportToCSV() {
     csvContent += row.join(",") + "\n";
   });
 
-  // สร้างไฟล์สำหรับดาวน์โหลด
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  
-  // ตั้งชื่อไฟล์ตามวันที่และเวลาดาวน์โหลด
-  const now = new Date();
-  const timestamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
-  link.setAttribute("download", `All_Expenses_Export_${timestamp}.csv`);
+  link.setAttribute("download", `Cycle_Report_${k}.csv`);
   
   document.body.appendChild(link);
   link.click();
