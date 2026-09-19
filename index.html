@@ -9,8 +9,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
 <!-- SheetJS (xlsx) สำหรับ Export Excel สไตล์พรีเมียม -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<!-- Tesseract.js สำหรับ OCR สแกนใบเสร็จ (ฟรีและโอเพนซอร์ส) -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
@@ -271,9 +269,9 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       </div>
     </div>
 
-    <!-- AI Scan Receipt Banner (Free 100%) -->
+    <!-- AI Scan Receipt Banner (Gemini API) -->
     <div class="ai-banner" onclick="document.getElementById('aiReceiptInput').click()">
-      ✨ <strong>สแกนใบเสร็จด้วย AI (ฟรี!)</strong><br><span style="font-size:11.5px; opacity:0.8;">แตะเพื่ออัปโหลดรูปใบเสร็จ ให้ AI ดึงข้อมูลให้อัตโนมัติ</span>
+      ✨ <strong>สแกนใบเสร็จด้วย Gemini AI (แม่นยำสูง)</strong><br><span style="font-size:11.5px; opacity:0.8;">แตะเพื่ออัปโหลดรูปใบเสร็จ ให้ AI ดึงข้อมูลให้อัตโนมัติ</span>
       <input type="file" id="aiReceiptInput" accept="image/*" class="hidden" onchange="scanReceiptWithAI(this)">
     </div>
 
@@ -325,7 +323,7 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
       </div>
     </div>
 
-    <!-- ฟอร์มตั้งค่าผ่อนชำระ (รองรับทั้งระบุ % หรือระบุยอดดอกเบี้ยเป็นบาทตรงๆ) -->
+    <!-- ฟอร์มตั้งค่าผ่อนชำระ (รองรับระบุ % หรือยอดดอกเบี้ย หรือผ่อนต่องวด) -->
     <div id="addInstallmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="5"></div>
       
@@ -625,58 +623,97 @@ function compressImage(file) {
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
 
-// --- AI Receipt Scanner (Free 100% using Tesseract.js) ---
+// ==========================================
+// --- GEMINI AI RECEIPT SCANNER ENGINE ---
+// ==========================================
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = error => reject(error);
+  });
+}
+
+async function analyzeReceiptWithGemini(imageFile) {
+  // ใส่ Gemini API Key ของคุณที่นี่
+  const apiKey = "AQ.Ab8RN6Kn61QOoVlprZA6uocFax77pNLcLSWsf3J0gxKNh10mUQ"; 
+  const base64Image = await fileToBase64(imageFile);
+
+  const prompt = `วิเคราะห์ใบเสร็จหรือสลิปนี้ แล้วสกัดข้อมูลออกมาเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:
+  {
+    "date": "YYYY-MM-DD (ปี ค.ศ.)",
+    "item": "ชื่อสินค้าหรือรายการ",
+    "amount": ตัวเลขยอดเงินรวม (float),
+    "isInstallment": true หรือ false (ถ้ามีการผ่อนชำระหลายงวด),
+    "months": จำนวนงวด (ถ้ามี ถ้าไม่มีให้ใส่ 1),
+    "interestBaht": ยอดดอกเบี้ยรวมเป็นบาท (ถ้ามี ถ้าไม่มีใส่ 0)
+  }`;
+
+  const payload = {
+    contents: [
+      {
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: imageFile.type,
+              data: base64Image
+            }
+          }
+        ]
+      }
+    ]
+  };
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await response.json();
+  let textResponse = data.candidates[0].content.parts[0].text;
+  textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+  return JSON.parse(textResponse);
+}
+
 async function scanReceiptWithAI(input) {
   const file = input.files[0];
-  if(!file) return;
+  if (!file) return;
   
-  const originalBtnText = document.querySelector('.ai-banner').innerHTML;
-  document.querySelector('.ai-banner').innerHTML = `⏳ <strong>AI กำลังอ่านใบเสร็จ...</strong><br><span style="font-size:11.5px;">โปรดรอสักครู่ ระบบกำลังประมวลผลข้อความ</span>`;
+  const banner = document.querySelector('.ai-banner');
+  const originalHTML = banner.innerHTML;
+  banner.innerHTML = `⏳ <strong>Gemini AI กำลังวิเคราะห์ใบเสร็จ...</strong><br><span style="font-size:11.5px;">โปรดรอสักครู่ ระบบกำลังดึงข้อมูล</span>`;
   
   try {
-    const compressedB64 = await compressImage(file);
-    document.getElementById('entryImg').files = input.files;
+    const extractedData = await analyzeReceiptWithGemini(file);
     
-    const result = await Tesseract.recognize(file, 'tha+eng', {
-      logger: m => console.log(m)
-    });
-    
-    const text = result.data.text;
-    console.log("OCR Extracted Text:", text);
-    
-    const moneyRegex = /\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g;
-    const matches = text.match(moneyRegex);
-    if(matches && matches.length > 0) {
-      const cleanNumbers = matches.map(m => Number(m.replace(/,/g, '')));
-      const maxAmount = Math.max(...cleanNumbers);
-      document.getElementById('amount').value = maxAmount;
+    if (extractedData) {
+      if (extractedData.date) document.getElementById('date').value = extractedData.date;
+      if (extractedData.item) document.getElementById('item').value = extractedData.item;
+      if (extractedData.amount) document.getElementById('amount').value = extractedData.amount;
+      
+      if (extractedData.isInstallment && extractedData.months > 1) {
+        document.querySelector('input[name="txType"][value="installment"]').checked = true;
+        toggleTxType();
+        
+        document.getElementById('addMonths').value = extractedData.months;
+        if (extractedData.interestBaht > 0) {
+          document.querySelector('input[name="interestType"][value="baht"]').checked = true;
+          toggleInterestInput();
+          document.getElementById('addInterestBaht').value = extractedData.interestBaht;
+        }
+      }
+      
+      document.getElementById('entryImg').files = input.files;
+      alert("🤖 Gemini AI ดึงข้อมูลจากสลิปสำเร็จ! ตรวจสอบความถูกต้องแล้วกดบันทึกได้เลยครับ");
     }
-    
-    const dateRegex = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/;
-    const dateMatch = text.match(dateRegex);
-    if(dateMatch) {
-      let d = pad(dateMatch[1]);
-      let m = pad(dateMatch[2]);
-      let y = dateMatch[3];
-      if(y.length === 2) y = "20" + y;
-      if(Number(y) > 2500) y = String(Number(y) - 543);
-      const parsedDateStr = `${y}-${m}-${d}`;
-      document.getElementById('date').value = parsedDateStr;
-      document.getElementById('addStartDate').value = parsedDateStr;
-    }
-    
-    if(text.toLowerCase().includes("ผ่อน") || text.toLowerCase().includes("installment") || text.toLowerCase().includes("งวด")) {
-      document.querySelector('input[name="txType"][value="installment"]').checked = true;
-      toggleTxType();
-    }
-    
-    document.getElementById('item').value = "สแกนจากใบเสร็จ (ตรวจสอบความถูกต้อง)";
-    alert("🤖 AI สแกนใบเสร็จสำเร็จ! ตรวจสอบข้อมูลแล้วกดบันทึกได้เลยครับ");
-    
   } catch (err) {
-    alert("ไม่สามารถอ่านข้อความจากรูปภาพได้ กรุณากรอกข้อมูลเองครับ");
+    console.error(err);
+    alert("ไม่สามารถวิเคราะห์รูปภาพได้ กรุณาตรวจสอบ API Key หรือลองใหม่อีกครั้ง");
   } finally {
-    document.querySelector('.ai-banner').innerHTML = originalBtnText;
+    banner.innerHTML = originalHTML;
     input.value = "";
   }
 }
@@ -763,7 +800,7 @@ function getIconForCategory(cat) {
   return "🏷️";
 }
 
-// --- Add Entry (Supports Direct Installments & Baht/Percent Interest Conversion) ---
+// --- Add Entry ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -801,7 +838,6 @@ async function addEntry(){
       if(intType === 'baht') {
         let interestBaht = Number(document.getElementById("addInterestBaht").value) || 0;
         totalInterest = interestBaht;
-        // คำนวณแปลงยอดดอกเบี้ยบาทให้เป็นเปอร์เซ็นต์ต่อปีอัตโนมัติเพื่อให้ระบบนำไปคำนวณต่อได้สมบูรณ์
         if (amount > 0 && months > 0) {
           let perYearFraction = (interestBaht / amount) * (12 / months);
           annualInterest = Number((perYearFraction * 100).toFixed(2));
@@ -850,14 +886,14 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-// --- Delete Handler with Icon & Confirmation Dialog ---
+// --- Delete Handler ---
 function deleteEntry(id) {
   if(confirm("⚠️ คุณต้องการลบรายการนี้ออกจากระบบ Cloud ใช่หรือไม่?")) {
     db.collection("entries").doc(id).delete().catch(err => alert("ลบไม่สำเร็จ: " + err.message));
   }
 }
 
-// --- แปลงรายการเก่าเป็นผ่อนชำระ ---
+// --- Convert Installment ---
 function openConvertInstModal(id) {
   const e = entries.find(x => x.id === id); if(!e) return;
   document.getElementById("convertEntryId").value = id;
@@ -1056,7 +1092,7 @@ function saveBudgetGoal() {
   render();
 }
 
-// --- Check Due Dates & Mobile Alerts ---
+// --- Check Due Dates ---
 function checkDueAlerts(currentCycleKey) {
   const banner = document.getElementById("dueAlertBanner");
   const channels = localSettings.channels || {};
@@ -1080,7 +1116,7 @@ function checkDueAlerts(currentCycleKey) {
   }
 }
 
-// --- Modal: สรุปยอดหนี้แยกตามช่องทาง ---
+// --- Modal: Channel Breakdown ---
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("methodModalCycleLabel").textContent = `อิงรอบบิลหลัก: ${cycleLabel(k)}`;
@@ -1139,7 +1175,7 @@ function openMethodBreakdownModal() {
 }
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// --- ฟังก์ชันกดดูรายละเอียดเจาะลึกรายบุคคล ---
+// --- Person Detail Modal ---
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`;
@@ -1221,7 +1257,6 @@ function openPersonDetail(personName) {
   document.getElementById("personModal").classList.add("open");
 }
 function closePersonModal() { document.getElementById("personModal").classList.remove("open"); }
-
 
 // --- Render Main List ---
 function render(){
@@ -1386,7 +1421,7 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์ Excel สไตล์พรีเมียมด้วย SheetJS (พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน และแสดง % ดอกเบี้ย) ---
+// --- Export Excel ---
 function exportStyledExcelWithSheetJS() {
   if (entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
@@ -1441,30 +1476,20 @@ function exportStyledExcelWithSheetJS() {
 
   flatList.forEach(row => {
     wsData.push([
-      row.date,
-      row.item,
-      row.owner,
-      row.method,
-      row.category,
-      row.amount,
-      row.repaid,
-      row.remain,
-      row.note
+      row.date, row.item, row.owner, row.method, row.category,
+      row.amount, row.repaid, row.remain, row.note
     ]);
   });
 
   let wb = XLSX.utils.book_new();
   let ws = XLSX.utils.aoa_to_sheet(wsData);
-
-  ws['!cols'] = [
-    {wch: 14}, {wch: 40}, {wch: 12}, {wch: 15}, {wch: 22}, {wch: 18}, {wch: 18}, {wch: 16}, {wch: 20}
-  ];
+  ws['!cols'] = [{wch: 14}, {wch: 40}, {wch: 12}, {wch: 15}, {wch: 22}, {wch: 18}, {wch: 18}, {wch: 16}, {wch: 20}];
 
   XLSX.utils.book_append_sheet(wb, ws, "Expense-Report");
   XLSX.writeFile(wb, `Expense-Report-${k}.xlsx`);
 }
 
-// --- Setting Modal (Per-Channel Cutoff & Due Dates) ---
+// --- Settings ---
 function openSettings(){ 
   let html = "";
   const channels = localSettings.channels || {};
@@ -1504,8 +1529,6 @@ function saveSettings(){
   render(); 
   alert("บันทึกการตั้งค่ารอบบิลและวันกำหนดจ่ายสำเร็จ!");
 }
-
-function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
 
 function setup(){
   const now = new Date(); 
