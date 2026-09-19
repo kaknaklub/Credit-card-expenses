@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.7</title>
+<title>Credit Card & Loan Master Pro V2.9.1</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -35,10 +35,10 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; background: #fff; border-radius: 4px; transition: width 0.4s ease; }
 
-.action-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 24px; }
-.action-btn { background: var(--bg); border: none; border-radius: 14px; padding: 10px 4px; box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; position: relative; }
+.action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 24px; }
+.action-btn { background: var(--bg); border: none; border-radius: 14px; padding: 12px 6px; box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; position: relative; }
 .action-btn .icon { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-white); display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--primary); }
-.action-btn span { font-size: 10px; font-weight: 500; color: var(--text-muted); text-align: center; }
+.action-btn span { font-size: 11px; font-weight: 500; color: var(--text-muted); text-align: center; }
 
 .section-title { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
 .section-title h3 { margin: 0; font-size: 17px; font-weight: 600; }
@@ -90,7 +90,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.7</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.1</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -147,10 +147,11 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
-    <!-- เมนูด่วนด้านล่าง (Action Grid 5 ปุ่ม) -->
+    <!-- เมนูด่วนด้านล่าง (Action Grid 6 ปุ่ม - จัด 3x2) -->
     <div class="action-grid">
       <div class="action-btn" style="position:relative;"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
       <div class="action-btn" onclick="openBudgetModal()"><div class="icon">🎯</div><span>ตั้งงบ</span></div>
+      <div class="action-btn" onclick="openBulkRepayModal()"><div class="icon">💸</div><span>จ่ายกลุ่ม</span></div>
       <div class="action-btn" onclick="openLineShareModal()"><div class="icon">💬</div><span>ส่ง LINE</span></div>
       <div class="action-btn" onclick="exportToCSV()"><div class="icon">📊</div><span>CSV</span></div>
       <div class="action-btn" onclick="openVisualReport()"><div class="icon">🖼️</div><span>พรีเมียม</span></div>
@@ -259,10 +260,65 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modals ต่างๆ -->
+<!-- Modal ชำระหนี้หลายรายการพร้อมกัน (Bulk Repay) -->
+<div class="modal" id="bulkRepayModal" onclick="if(event.target===this)closeBulkRepayModal()">
+  <div class="sheet" style="max-width: 600px;">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 6px; font-size:20px; text-align:center">💸 ชำระหนี้หลายรายการพร้อมกัน (Bulk Repay)</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="bulkModalCycleLabel"></div>
+    
+    <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:13px; font-weight:600;">เลือกรายการที่ต้องการเคลียร์หนี้:</span>
+        <button class="badge" style="cursor:pointer; background:var(--primary); color:#fff; border:none; padding:4px 8px;" onclick="toggleSelectAllBulk(true)">เลือกทั้งหมด</button>
+      </div>
+      <div style="max-height: 30vh; overflow-y: auto; padding-right:4px;" id="bulkItemsContainer"></div>
+    </div>
+
+    <div class="input-group">
+      <label>ใครเป็นคนชำระคืนรอบนี้?</label>
+      <select id="bulkPayerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;">
+        <option value="Nu">Nu</option>
+        <option value="B">B</option>
+      </select>
+    </div>
+
+    <div class="input-group"><label>วันที่โอน</label><input id="bulkDate" type="date"></div>
+    <div class="input-group"><label>📷 แนบสลิปใบเสร็จกลาง (สำหรับแชร์)</label><input id="bulkImg" type="file" accept="image/*"></div>
+    
+    <div style="margin-bottom:16px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="bulkShareSlip" checked style="width:18px; height:18px; accent-color:var(--primary); box-shadow:none;">
+      <label for="bulkShareSlip" style="font-size:13px; margin:0; cursor:pointer;">แนบสลิปใบนี้ให้กับทุกรายการที่เลือกพร้อมกัน</label>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.04); padding:12px; border-radius:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:13px;">ยอดรวมที่เลือกชำระ:</span>
+      <strong id="bulkSelectedTotalAmt" style="font-size:18px; color:var(--danger);">฿0.00</strong>
+    </div>
+
+    <button class="btn-main" onclick="openBulkConfirmModal()" id="btnBulkNext">ตรวจสอบและยืนยันการชำระ</button>
+    <button class="btn-main" style="margin-top:10px; background:var(--bg); color:var(--text-main); box-shadow:3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="closeBulkRepayModal()">ปิดหน้าต่าง</button>
+  </div>
+</div>
+
+<!-- Modal ยืนยันรอบสุดท้าย (Double Confirmation) -->
+<div class="modal" id="bulkConfirmModal" onclick="if(event.target===this)closeBulkConfirmModal()">
+  <div class="sheet" style="max-width: 480px; text-align:center;">
+    <div class="grabber"></div>
+    <div style="font-size:40px; margin-bottom:10px;">⚠️</div>
+    <h3 style="margin:0 0 10px; font-size:20px; color:var(--danger);">ยืนยันการชำหนี้แบบกลุ่ม?</h3>
+    <p style="font-size:13.5px; color:var(--text-muted); margin-bottom:20px;" id="bulkConfirmText">คุณกำลังจะทำเครื่องหมายว่าชำระหนี้สำหรับรายการที่เลือก...</p>
+    
+    <div style="display:flex; gap:10px;">
+      <button class="btn-main" style="background:var(--bg); color:var(--text-main); box-shadow:3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="closeBulkConfirmModal()">ยกเลิก</button>
+      <button class="btn-main" style="background:var(--danger); box-shadow:0 5px 15px rgba(226,109,109,0.4);" onclick="confirmBulkRepay()" id="btnConfirmBulkExec">ยืนยันชำระทั้งหมด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modals อื่นๆ เดิม -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- Modal กราฟสถิติเชิงลึกแยกตามหมวดหมู่ -->
 <div class="modal" id="analyticsModal" onclick="if(event.target===this)closeAnalyticsModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -273,7 +329,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modal ข้อความสรุปส่ง LINE -->
 <div class="modal" id="lineShareModal" onclick="if(event.target===this)closeLineShareModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -284,7 +339,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modal รายละเอียดรายบุคคล -->
 <div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -308,7 +362,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <div class="modal" id="convertInstModal" onclick="if(event.target===this)closeConvertInstModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 เปลี่ยนรายการนี้เป็นยอดผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="convertInstItemName">-</div><div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="ciMonths" type="number" min="2" max="60" value="10"></div><div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0"></div><div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="ciStartDate" type="date"></div><button class="btn-main" style="margin-top:10px;" onclick="confirmConvertToInstallment()">ยืนยันสร้างตารางผ่อน</button><input type="hidden" id="convertEntryId"></div></div>
 
-<!-- Modal รายงานพรีเมียม -->
 <div class="modal" id="reportModal" onclick="if(event.target===this)closeReportModal()">
   <div class="sheet" style="max-width: 800px; height: 88vh; padding: 22px 16px;">
     <div class="grabber"></div>
@@ -336,7 +389,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ดอกเบี้ยรวม: <strong id="instInterestVal" style="color:var(--danger)">฿0.00</strong></span><span>อัตราดอกเบี้ย: <strong id="instPercentVal">0% ต่อปี</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto; padding-right:4px;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- Modal บันทึกการชำระคืน -->
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
   <div class="sheet">
     <div class="grabber"></div>
@@ -379,10 +431,126 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.7")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.1")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
+
+// --- BULK REPAYMENT LOGIC ---
+function openBulkRepayModal() {
+  const k = document.getElementById("cycleSelect").value;
+  if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
+  document.getElementById("bulkModalCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); 
+    return keyFromDateForMethod(x.date, m) === k; 
+  });
+
+  let html = "";
+  let unpaidCount = 0;
+  es.forEach(x => {
+    let eff = getEffectiveItemData(x, k);
+    if(eff.remain > 0) {
+      unpaidCount++;
+      html += `
+        <div style="display:flex; align-items:center; justify-content:space-between; background:var(--surface-white); padding:10px 12px; border-radius:12px; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+            <input type="checkbox" class="bulk-item-checkbox" data-id="${x.id}" data-remain="${eff.remain}" onchange="updateBulkTotal()" style="width:18px; height:18px; accent-color:var(--primary); box-shadow:none;">
+            <div style="overflow:hidden;">
+              <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(x.item)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${esc(x.method)} • ค้าง <strong>฿${money(eff.remain)}</strong></div>
+            </div>
+          </div>
+        </div>`;
+    }
+  });
+
+  if(unpaidCount === 0) {
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค้างชำระในรอบบิลนี้ 🎉</div>`;
+  }
+
+  document.getElementById("bulkItemsContainer").innerHTML = html;
+  document.getElementById("bulkDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
+  document.getElementById("bulkImg").value = "";
+  document.getElementById("bulkShareSlip").checked = true;
+  updateBulkTotal();
+  document.getElementById("bulkRepayModal").classList.add("open");
+}
+
+function closeBulkRepayModal() { document.getElementById("bulkRepayModal").classList.remove("open"); }
+
+function toggleSelectAllBulk(select) {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox');
+  checkboxes.forEach(cb => cb.checked = select);
+  updateBulkTotal();
+}
+
+function updateBulkTotal() {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+  let total = 0;
+  checkboxes.forEach(cb => {
+    total += Number(cb.getAttribute('data-remain')) || 0;
+  });
+  document.getElementById("bulkSelectedTotalAmt").textContent = "฿" + money(total);
+}
+
+function openBulkConfirmModal() {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+  if(checkboxes.length === 0) {
+    alert("กรุณาเลือกอย่างน้อย 1 รายการที่ต้องการชำระ");
+    return;
+  }
+  const totalStr = document.getElementById("bulkSelectedTotalAmt").textContent;
+  document.getElementById("bulkConfirmText").textContent = `คุณกำลังจะบันทึกชำระหนี้จำนวน ${checkboxes.length} รายการ รวมเป็นเงิน ${totalStr} แน่ใจหรือไม่?`;
+  document.getElementById("bulkConfirmModal").classList.add("open");
+}
+
+function closeBulkConfirmModal() { document.getElementById("bulkConfirmModal").classList.remove("open"); }
+
+async function confirmBulkRepay() {
+  const btn = document.getElementById("btnConfirmBulkExec");
+  try {
+    btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
+    const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+    const date = document.getElementById("bulkDate").value;
+    const payer = document.getElementById("bulkPayerSelect").value;
+    const shareSlip = document.getElementById("bulkShareSlip").checked;
+    const currentCycleKey = document.getElementById("cycleSelect").value;
+
+    const file = document.getElementById("bulkImg").files[0];
+    const b64Img = await compressImage(file);
+    const finalSlip = shareSlip ? b64Img : null;
+
+    for (let cb of checkboxes) {
+      let id = cb.getAttribute('data-id');
+      let remainAmt = Number(cb.getAttribute('data-remain')) || 0;
+      let e = entries.find(x => x.id === id);
+      if(!e) continue;
+
+      if (e.isInstallment && e.installmentPlan) {
+        let m = e.method || "CreditCard";
+        let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid);
+        if (targetSchedule) {
+          targetSchedule.paid = true;
+          await db.collection("entries").doc(id).update({ installmentPlan: e.installmentPlan });
+        }
+      }
+
+      const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
+      await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+    }
+
+    closeBulkConfirmModal();
+    closeBulkRepayModal();
+    alert("✅ บันทึกชำระหนี้แบบกลุ่มสำเร็จเรียบร้อย!");
+  } catch (err) {
+    alert("เกิดข้อผิดพลาด: " + err.message);
+  } finally {
+    btn.textContent = "ยืนยันชำระทั้งหมด"; btn.disabled = false;
+  }
+}
 
 // Visual Analytics Modal
 function openAnalyticsModal() {
@@ -456,7 +624,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.7`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.1`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -683,7 +851,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.7", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.1", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -873,10 +1041,11 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       
       let scheduleRepayments = [...(x.repayments || [])].map(r => ({
         amount: r.amount / matchingSchedules.length,
-        payer: r.payer
+        payer: r.payer,
+        image: r.image
       }));
       if (s.paid) {
-        scheduleRepayments.push({ amount: scheduleTotal, payer: "" });
+        scheduleRepayments.push({ amount: scheduleTotal, payer: "", image: null });
       }
 
       let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
@@ -1237,7 +1406,17 @@ function render(){
 
       let hHtml = ""; 
       if(x.repayments && x.repayments.length > 0) {
-        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;"><span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span><div><strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong><button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button></div></div>`).join("")}</div>`;
+        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => {
+          let slipBtn = r.image ? `<span style="cursor:pointer; margin-right:8px; font-size:14px;" onclick="viewImage('${r.image}')" title="ดูรูปสลิป">📷</span>` : "";
+          return `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;">
+            <span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span>
+            <div>
+              ${slipBtn}
+              <strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong>
+              <button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button>
+            </div>
+          </div>`;
+        }).join("")}</div>`;
       }
 
       const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; 
@@ -1285,7 +1464,6 @@ function render(){
             </div>`; 
   }).join("");
 
-  // คำนวณยอดใช้จ่ายรวมในรอบบิลนี้ (Total Spent) เพื่อหักงบแบบถาวรและแสดงผลชัดเจน
   let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).amount, 0); 
   let budgetLimit = localSettings.budgets[k] || 0; 
   let budgetRemain = budgetLimit - totalSpentInCycle; 
