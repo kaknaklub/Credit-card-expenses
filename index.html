@@ -396,7 +396,7 @@ function onSplitInput(changed) {
     if (changed === 'Nu') {
       bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     } else {
-      nuInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
+      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2); // Fixed bug here
     }
   }
 }
@@ -597,7 +597,7 @@ async function confirmChangeOwner() {
 
 function openConvertInstModal(id) { const e = entries.find(x => x.id === id); if(!e) return; document.getElementById("convertEntryId").value = id; document.getElementById("convertInstItemName").textContent = `${e.item} (฿${money(e.amount)})`; const now = new Date(); document.getElementById("ciStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("convertInstModal").classList.add("open"); }
 function closeConvertInstModal() { document.getElementById("convertInstModal").classList.remove("open"); }
-async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จติดตั้งเรียบร้อย!"); }
+async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จ!"); }
 
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
@@ -612,25 +612,74 @@ function getEffectiveItemData(e, selectedCycleKey) {
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
 }
 
-// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละคนตามสัดส่วน (รองรับทั้ง Percent และ Amount ได้อย่างถูกต้องแม่นยำ)
-function getPersonShareForEntry(x, effAmount, personName) {
+// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละคนอย่างแม่นยำ (สอดคล้องทั้งหน้าหลักและหน้าต่างรายละเอียด)
+function getPersonItemBreakdown(x, selectedCycleKey, personName) {
+  let m = x.method || "CreditCard";
+  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+  if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
+
+  let totalSpent = 0;
+  let totalPaid = 0;
+  let totalRemain = 0;
+
+  if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+    let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
+    matchingSchedules.forEach(s => {
+      let scheduleTotal = s.amount;
+      let pShare = getShareForPerson(x, scheduleTotal, personName);
+      totalSpent += pShare;
+
+      let schedulePaid = s.paid ? pShare : 0;
+      let manualPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
+      let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
+
+      let ratio = scheduleTotal > 0 ? (pShare / scheduleTotal) : 0.5;
+      let totalPaidByOwner = schedulePaid + manualPaid + (unassignedPaid * ratio);
+      let remain = Math.max(0, pShare - totalPaidByOwner);
+
+      totalPaid += (pShare - remain);
+      totalRemain += remain;
+    });
+  } else {
+    let cycleKey = keyFromDateForMethod(x.date, m);
+    if (cycleKey === selectedCycleKey) {
+      let eff = getEffectiveItemData(x, selectedCycleKey);
+      let pShare = getShareForPerson(x, eff.amount, personName);
+      totalSpent += pShare;
+
+      let manualPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
+      let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
+
+      let isSplit = owners.length === 2;
+      let ratio = eff.amount > 0 ? (pShare / eff.amount) : 0.5;
+      let totalPaidByOwner = manualPaid + (isSplit ? unassignedPaid * ratio : unassignedPaid);
+
+      let remain = Math.max(0, pShare - totalPaidByOwner);
+      totalPaid += (pShare - remain);
+      totalRemain += remain;
+    }
+  }
+  return { spent: totalSpent, paid: totalPaid, remain: totalRemain };
+}
+
+function getShareForPerson(x, totalAmt, personName) {
   let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
   if (!owners.includes(personName)) return 0;
-  if (owners.length === 1) return effAmount;
+  if (owners.length === 1) return totalAmt;
 
   if (x.splitDetails) {
     let mode = x.splitDetails.mode;
     if (mode === 'percent') {
       let p = Number(x.splitDetails[personName]) || 50;
-      return effAmount * (p / 100);
+      return totalAmt * (p / 100);
     } else {
       let exactAmt = Number(x.splitDetails[personName]) || (x.amount / 2);
-      let totalOriginal = x.amount > 0 ? x.amount : 1;
-      let ratio = exactAmt / totalOriginal;
-      return effAmount * ratio;
+      let originalTotal = x.amount > 0 ? x.amount : 1;
+      let ratio = exactAmt / originalTotal;
+      return totalAmt * ratio;
     }
   } else {
-    return effAmount * 0.5;
+    return totalAmt * 0.5;
   }
 }
 
@@ -822,31 +871,16 @@ function openPersonDetail(personName) {
   let totalSpent = 0; let totalPaid = 0; let totalRemain = 0; let methodGroups = {};
 
   matchedEntries.forEach(x => {
-    const eff = getEffectiveItemData(x, k); 
-    if (!eff.isInstActiveInCycle && x.isInstallment) return;
+    let breakdown = getPersonItemBreakdown(x, k, personName);
+    if (breakdown.spent <= 0) return;
 
-    let isSplit = (x.owner === "Nu & B" || x.owner === "Nu and B");
-    let itemSpent = getPersonShareForEntry(x, eff.amount, personName);
-
-    let ownerPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
-    let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
-    if (!isSplit && unassignedPaid > 0) ownerPaid += unassignedPaid;
-    if (isSplit && unassignedPaid > 0) {
-      let pShare = getPersonShareForEntry(x, eff.amount, personName);
-      let ratio = eff.amount > 0 ? (pShare / eff.amount) : 0.5;
-      ownerPaid += (unassignedPaid * ratio);
-    }
-
-    let itemRemain = Math.max(0, itemSpent - ownerPaid);
-    let itemPaid = itemSpent - itemRemain;
-
-    totalSpent += itemSpent; 
-    totalRemain += itemRemain; 
-    totalPaid += itemPaid;
+    totalSpent += breakdown.spent; 
+    totalPaid += breakdown.paid; 
+    totalRemain += breakdown.remain;
 
     let m = x.method || "CreditCard"; 
     if(!methodGroups[m]) methodGroups[m] = []; 
-    methodGroups[m].push({ ...x, itemSpent, itemPaid, itemRemain });
+    methodGroups[m].push({ ...x, itemSpent: breakdown.spent, itemPaid: breakdown.paid, itemRemain: breakdown.remain });
   });
 
   let html = ""; 
@@ -910,23 +944,10 @@ function render(){
       owners.forEach(ownerName => {
         if (!pD[ownerName]) pD[ownerName] = { s: 0, p: 0, rm: 0 };
         
-        let shareAmt = getPersonShareForEntry(x, eff.amount, ownerName);
-        
-        let ownerPaid = (x.repayments || []).filter(r => r.payer === ownerName).reduce((sum, r) => sum + r.amount, 0);
-        let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
-        
-        let isSplit = owners.length === 2;
-        if (!isSplit && unassignedPaid > 0) ownerPaid += unassignedPaid;
-        if (isSplit && unassignedPaid > 0) {
-          let ratio = eff.amount > 0 ? (shareAmt / eff.amount) : 0.5;
-          ownerPaid += (unassignedPaid * ratio);
-        }
-
-        let ownerRemain = Math.max(0, shareAmt - ownerPaid);
-
-        pD[ownerName].s += shareAmt;
-        pD[ownerName].p += ownerPaid;
-        pD[ownerName].rm += ownerRemain;
+        let breakdown = getPersonItemBreakdown(x, k, ownerName);
+        pD[ownerName].s += breakdown.spent;
+        pD[ownerName].p += breakdown.paid;
+        pD[ownerName].rm += breakdown.remain;
       });
 
       let hHtml = ""; 
@@ -1048,7 +1069,7 @@ function filterVisualReport() {
     let matchCat = !catFilter || r.category === catFilter;
     let matchMethod = !methodFilter || r.method === methodFilter;
     return matchKw && matchCat && matchMethod;
-  }).sort((a,b)=>a.sortDate.locateCompare ? a.sortDate.localeCompare(b.sortDate) : a.sortDate.localeCompare(b.sortDate));
+  }).sort((a,b)=>a.sortDate.localeCompare(b.sortDate));
 
   let html = `<table class="report-table"><tr><th>วันที่</th><th>รายการ</th><th>ช่องทาง</th><th>หมวดหมู่</th><th>ยอด (฿)</th><th>ผู้จ่าย</th></tr>`;
   if (filtered.length === 0) {
