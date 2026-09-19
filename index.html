@@ -20,14 +20,9 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card { background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 28px; padding: 22px; color: #fff; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(126, 168, 138, 0.35); position: relative; overflow: hidden; }
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
-.split-badges-container { width: 100%; overflow-x: auto; white-space: nowrap; margin-bottom: 12px; padding-bottom: 4px; }
-.split-badges-container::-webkit-scrollbar { display: none; }
-.split-badges { display: inline-flex; gap: 8px; }
-.split-badge { background: rgba(255,255,255,0.2); padding: 8px 14px; border-radius: 12px; min-width: 110px; backdrop-filter: blur(4px); cursor: pointer; border: 1px solid transparent; display: inline-block; vertical-align: top; }
-.split-badge span { display: block; font-size: 11px; opacity: 0.9; }
-.split-badge strong { display: block; font-size: 14px; margin-top: 2px; }
-.method-breakdown-btn { background: rgba(0,0,0,0.12); border: none; width: 100%; border-radius: 12px; padding: 9px 12px; color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 12px; }
-.budget-box { background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px; }
+.method-breakdown-btn { background: rgba(0,0,0,0.12); border: none; width: 100%; border-radius: 12px; padding: 11px 14px; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 10px; transition: background 0.2s; }
+.method-breakdown-btn:active { background: rgba(0,0,0,0.2); }
+.budget-box { background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px; margin-top: 12px; }
 .budget-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; opacity: 0.95; }
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; background: #fff; border-radius: 4px; transition: width 0.4s ease; }
@@ -93,8 +88,15 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div class="balance-card">
       <p>ยอดค้างรอบบิลปัจจุบัน (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
-      <div class="split-badges-container"><div class="split-badges" id="personSummary"></div></div>
-      <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">💳 เช็กยอดหนี้แยกตามช่องทาง</button>
+      
+      <!-- 🌟 ส่วนแสดงยอดหนี้รายบุคคลแบบปุ่มเต็มความกว้างสะอาดตา -->
+      <div id="personSummary" style="margin-bottom: 10px;"></div>
+
+      <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
+        <span>💳 เช็กยอดหนี้แยกตามช่องทาง</span>
+        <span>▼</span>
+      </button>
+
       <div class="budget-box">
         <div class="budget-info"><span>งบเดือนนี้: <strong id="budgetText">฿0.00</strong></span><span>เหลือใช้: <strong id="budgetRemainText">฿0.00</strong></span></div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="budgetProgressBar" style="width: 0%;"></div></div>
@@ -1080,14 +1082,16 @@ function render(){
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
+  // 🌟 เรนเดอร์ยอดหนี้รายบุคคลให้อยู่ในรูปแบบปุ่มเต็มความกว้าง (Full-width button style) สะอาดตาราวกับเมนูแยกตามช่องทาง
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
   document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
     let dat = pD[p] || { rm: 0 }; 
-    return `<div class="split-badge" onclick="openPersonDetail('${p}')"><span>👤 ${esc(p)}</span><strong style="color:${dat.rm > 0 ? '#ffebeb' : '#ffffff'}">฿${money(dat.rm)}</strong></div>`; 
+    return `<button class="method-breakdown-btn" onclick="openPersonDetail('${p}')">
+              <span>👤 ยอดหนี้ของ ${esc(p)}</span>
+              <strong style="color:${dat.rm > 0 ? '#ffdddd' : '#ffffff'}">฿${money(dat.rm)}</strong>
+            </button>`; 
   }).join("");
 
-  // 🌟 ปรับปรุงให้ยอดใช้จ่ายในงบรวม (totalSpentInCycle) คิดจากยอดหนี้คงเหลือที่ยังไม่เคลียร์ (eff.remain) 
-  // ทำให้เมื่อจ่ายหนี้แล้ว ยอดหนี้ลดลง งบเหลือใช้ (budgetRemain) จะเพิ่มขึ้นตามความเป็นจริงแบบเรียลไทม์
   let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).remain, 0); 
   let budgetLimit = localSettings.budgets[k] || 0; 
   let budgetRemain = budgetLimit - totalSpentInCycle; 
