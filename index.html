@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.5</title>
+<title>Credit Card & Loan Master Pro V2.9.6</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -91,7 +91,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.5</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.6</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -259,22 +259,34 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <button class="btn-main" onclick="addEntry()" id="btnAddEntry">บันทึกรายการ</button>
   </div>
 
-  <!-- ================= BOTTOM NAVIGATION ================= -->
+  <!-- ================= BOTTOM NAVIGATION (Replaced Profile with History) ================= -->
   <nav class="bottom-nav">
     <div class="nav-item active" id="navHome" onclick="switchView('home')"><i>🏠</i><span>Home</span></div>
     <div class="nav-fab" onclick="switchView('add')">+</div>
-    <div class="nav-item" id="navProfile" onclick="switchView('profile')"><i>👤</i><span>Profile</span></div>
+    <div class="nav-item" id="navHistory" onclick="openPaymentHistoryModal()"><i>📜</i><span>ประวัติจ่าย</span></div>
   </nav>
 </div>
 
-<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal) -->
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.9.6 - Search, Sort, Group by Channel) -->
 <div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
     <h3 style="margin:0 0 6px; font-size:20px; text-align:center">📜 ประวัติการชำระเงินรอบบิล</h3>
-    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="payHistCycleLabel"></div>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:12px;" id="payHistCycleLabel"></div>
     <div id="payHistSummaryBox"></div>
-    <div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="payHistContainer"></div>
+    
+    <!-- Search & Sort Controls -->
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input type="text" id="payHistSearch" class="report-search" style="margin-bottom:0; flex:2;" placeholder="🔍 ค้นหา (ชื่อรายการ, ผู้จ่าย)..." oninput="renderPaymentHistoryList()">
+      <select id="payHistSort" class="report-search" style="margin-bottom:0; flex:1;" onchange="renderPaymentHistoryList()">
+        <option value="dateDesc">วันที่ (ใหม่-เก่า)</option>
+        <option value="dateAsc">วันที่ (เก่า-ใหม่)</option>
+        <option value="amountDesc">ยอดเงิน (มาก-น้อย)</option>
+        <option value="amountAsc">ยอดเงิน (น้อย-มาก)</option>
+      </select>
+    </div>
+
+    <div style="max-height: 42vh; overflow-y: auto; padding-right:4px;" id="payHistContainer"></div>
     <button class="btn-main" style="margin-top:20px;" onclick="closePaymentHistoryModal()">ปิดหน้าต่าง</button>
   </div>
 </div>
@@ -457,12 +469,14 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.5")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.6")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
 
-// --- PAYMENT HISTORY MODAL LOGIC (Enhanced V2.9.5) ---
+// --- PAYMENT HISTORY MODAL LOGIC (V2.9.6: Search, Sort, Group by Channel) ---
+let cachedPaymentHistoryItems = [];
+
 function openPaymentHistoryModal() {
   const k = document.getElementById("cycleSelect").value;
   if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
@@ -474,7 +488,7 @@ function openPaymentHistoryModal() {
     return keyFromDateForMethod(x.date, m) === k; 
   });
 
-  let historyItems = [];
+  cachedPaymentHistoryItems = [];
   let totalHistAmt = 0;
   let payerSummary = {};
 
@@ -488,12 +502,12 @@ function openPaymentHistoryModal() {
           let p = r.payer || "ทั่วไป";
           payerSummary[p] = (payerSummary[p] || 0) + r.amount;
           
-          historyItems.push({
+          cachedPaymentHistoryItems.push({
             type: 'normal',
             entryId: x.id,
             itemId: r.id,
             itemName: x.item,
-            method: x.method,
+            method: x.method || "CreditCard",
             date: r.date,
             amount: r.amount,
             payer: r.payer,
@@ -509,12 +523,12 @@ function openPaymentHistoryModal() {
           let p = s.payer || "ทั่วไป";
           payerSummary[p] = (payerSummary[p] || 0) + s.amount;
 
-          historyItems.push({
+          cachedPaymentHistoryItems.push({
             type: 'installment',
             entryId: x.id,
             scheduleNo: s.no,
             itemName: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`,
-            method: x.method,
+            method: x.method || "CreditCard",
             date: s.paidDate || s.dueDate,
             amount: s.amount,
             payer: s.payer,
@@ -525,53 +539,98 @@ function openPaymentHistoryModal() {
     }
   });
 
-  historyItems.sort((a,b) => b.date.localeCompare(a.date));
-
-  // Render Summary Box Inside Modal
+  // Render Summary Box
   let summaryBoxHtml = "";
-  if (historyItems.length > 0) {
+  if (cachedPaymentHistoryItems.length > 0) {
     let chips = Object.keys(payerSummary).map(p => `<div style="background:rgba(255,255,255,0.2); padding:5px 10px; border-radius:10px; font-size:11.5px; backdrop-filter:blur(4px);">👤 ${esc(p)}: <strong>฿${money(payerSummary[p])}</strong></div>`).join("");
     summaryBoxHtml = `
-      <div style="background:linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius:20px; padding:16px; color:#fff; margin-bottom:16px; box-shadow:0 6px 18px rgba(126,168,138,0.3);">
+      <div style="background:linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius:20px; padding:16px; color:#fff; margin-bottom:14px; box-shadow:0 6px 18px rgba(126,168,138,0.3);">
         <div style="font-size:11.5px; opacity:0.9; text-transform:uppercase; letter-spacing:0.5px;">ยอดชำระสำเร็จรวมในรอบบิลนี้</div>
         <div style="font-size:26px; font-weight:700; margin:4px 0 10px; letter-spacing:-0.5px;">฿${money(totalHistAmt)}</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">${chips}</div>
       </div>`;
   }
   document.getElementById("payHistSummaryBox").innerHTML = summaryBoxHtml;
+  document.getElementById("payHistSearch").value = "";
+  document.getElementById("payHistSort").value = "dateDesc";
+
+  renderPaymentHistoryList();
+  document.getElementById("paymentHistoryModal").classList.add("open");
+}
+
+function renderPaymentHistoryList() {
+  const keyword = (document.getElementById("payHistSearch").value || "").toLowerCase();
+  const sortType = document.getElementById("payHistSort").value;
+
+  // Filter items
+  let filtered = cachedPaymentHistoryItems.filter(h => {
+    let matchName = h.itemName.toLowerCase().includes(keyword);
+    let matchPayer = (h.payer || "").toLowerCase().includes(keyword);
+    let matchMethod = h.method.toLowerCase().includes(keyword);
+    return matchName || matchPayer || matchMethod;
+  });
+
+  // Sort items
+  filtered.sort((a, b) => {
+    if (sortType === 'dateDesc') return b.date.localeCompare(a.date);
+    if (sortType === 'dateAsc') return a.date.localeCompare(b.date);
+    if (sortType === 'amountDesc') return b.amount - a.amount;
+    if (sortType === 'amountAsc') return a.amount - b.amount;
+    return 0;
+  });
+
+  // Group by channel (method)
+  let groups = {};
+  filtered.forEach(h => {
+    let m = h.method || "อื่นๆ";
+    if (!groups[m]) groups[m] = [];
+    groups[m].push(h);
+  });
 
   let html = "";
-  if (historyItems.length === 0) {
-    html = `<div style="text-align:center; padding:30px; color:var(--text-muted);">ยังไม่มีประวัติการชำระเงินในรอบบิลนี้ 📭</div>`;
+  if (Object.keys(groups).length === 0) {
+    html = `<div style="text-align:center; padding:30px; color:var(--text-muted);">ไม่พบประวัติการชำระเงินตามเงื่อนไข 📭</div>`;
   } else {
-    historyItems.forEach(h => {
-      let slipThumbnail = h.image ? `<img src="${h.image}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="viewImage('${h.image}')">` : '<span style="opacity:0.3; font-size:12px;">📷</span>';
-      let cancelAction = h.type === 'installment' 
-        ? `cancelPaymentItem('${h.entryId}', 'installment', ${h.scheduleNo})` 
-        : `cancelPaymentItem('${h.entryId}', 'normal', '${h.itemId}')`;
+    for (let method in groups) {
+      let items = groups[method];
+      let channelTotal = items.reduce((sum, i) => sum + i.amount, 0);
 
       html += `
-        <div style="background:var(--surface-white); border-radius:16px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
-          <div style="display:flex; align-items:center; gap:12px; overflow:hidden;">
-            <div style="width:42px; height:42px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; box-shadow:inset 2px 2px 5px var(--shadow-dark);">${slipThumbnail}</div>
-            <div style="overflow:hidden;">
-              <div style="font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(h.itemName)}</div>
-              <div style="font-size:11px; color:var(--text-muted);">${fmtDate(h.date)} • ${esc(h.method)} ${h.payer ? '• ('+h.payer+')' : ''}</div>
+        <div style="margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg); padding:8px 12px; border-radius:10px; margin-bottom:8px; box-shadow:inset 2px 2px 5px var(--shadow-dark);">
+            <strong style="font-size:13.5px; color:var(--primary-dark);">🏷️ ช่องทาง: ${esc(method)}</strong>
+            <span style="font-size:12px; font-weight:700; color:var(--text-main);">รวม ฿${money(channelTotal)}</span>
+          </div>`;
+
+      items.forEach(h => {
+        let slipThumbnail = h.image ? `<img src="${h.image}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="viewImage('${h.image}')">` : '<span style="opacity:0.3; font-size:12px;">📷</span>';
+        let cancelAction = h.type === 'installment' 
+          ? `cancelPaymentItem('${h.entryId}', 'installment', ${h.scheduleNo})` 
+          : `cancelPaymentItem('${h.entryId}', 'normal', '${h.itemId}')`;
+
+        html += `
+          <div style="background:var(--surface-white); border-radius:14px; padding:10px 12px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+              <div style="width:38px; height:38px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; box-shadow:inset 2px 2px 4px var(--shadow-dark);">${slipThumbnail}</div>
+              <div style="overflow:hidden;">
+                <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(h.itemName)}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${fmtDate(h.date)} ${h.payer ? '• ('+h.payer+')' : ''}</div>
+              </div>
             </div>
-          </div>
-          <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:10px;">
-            <div>
-              <div style="font-size:14px; font-weight:700; color:var(--primary-dark);">฿${money(h.amount)}</div>
-              <div style="font-size:9.5px; color:var(--primary); font-weight:600;">จ่ายแล้ว ✓</div>
+            <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:8px;">
+              <div>
+                <div style="font-size:13.5px; font-weight:700; color:var(--primary-dark);">฿${money(h.amount)}</div>
+                <div style="font-size:9px; color:var(--primary); font-weight:600;">จ่ายแล้ว ✓</div>
+              </div>
+              <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:5px 8px; cursor:pointer; font-weight:600;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
             </div>
-            <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:6px 10px; cursor:pointer; font-weight:600;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
-          </div>
-        </div>`;
-    });
+          </div>`;
+      });
+      html += `</div>`;
+    }
   }
 
   document.getElementById("payHistContainer").innerHTML = html;
-  document.getElementById("paymentHistoryModal").classList.add("open");
 }
 
 function closePaymentHistoryModal() {
@@ -597,6 +656,7 @@ async function cancelPaymentItem(entryId, type, idOrNo) {
     await db.collection("entries").doc(entryId).update({ repayments: updatedRepayments });
   }
 
+  // Refresh cache and re-open/re-render
   openPaymentHistoryModal();
   render();
   alert("✅ ยกเลิกการชำระและซิงค์ข้อมูลเรียบร้อยแล้ว!");
@@ -808,7 +868,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.5`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.6`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1038,7 +1098,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.5", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.6", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1053,8 +1113,14 @@ function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&
 
 function switchView(view) {
   document.getElementById('view-home').classList.add('hidden'); document.getElementById('view-add').classList.add('hidden');
-  if(view === 'home' || view === 'profile') { document.getElementById('view-home').classList.remove('hidden'); document.getElementById('navHome').classList.toggle('active', view === 'home'); document.getElementById('navProfile').classList.toggle('active', view === 'profile');
-  } else if(view === 'add') { document.getElementById('view-add').classList.remove('hidden'); document.getElementById('navHome').classList.remove('active'); document.getElementById('navProfile').classList.remove('active'); const now = new Date(); const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("date").value = dateStr; document.getElementById("addStartDate").value = dateStr; }
+  if(view === 'home') { 
+    document.getElementById('view-home').classList.remove('hidden'); 
+    document.getElementById('navHome').classList.add('active'); 
+  } else if(view === 'add') { 
+    document.getElementById('view-add').classList.remove('hidden'); 
+    document.getElementById('navHome').classList.remove('active'); 
+    const now = new Date(); const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("date").value = dateStr; document.getElementById("addStartDate").value = dateStr; 
+  }
   window.scrollTo(0,0);
 }
 
