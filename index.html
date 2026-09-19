@@ -20,6 +20,14 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card { background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 28px; padding: 22px; color: #fff; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(126, 168, 138, 0.35); position: relative; overflow: hidden; }
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
+
+/* 🌟 สไตล์ Badge รายบุคคลแบบสะอาดตา จัดเรียงขึ้นลง (Flex Wrap) ไม่มีเลื่อนแนวนอน */
+.split-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.split-badge { background: rgba(255,255,255,0.2); padding: 9px 14px; border-radius: 14px; flex: 1; min-width: 110px; backdrop-filter: blur(4px); cursor: pointer; border: 1px solid transparent; transition: background 0.2s; }
+.split-badge:active { background: rgba(255,255,255,0.35); }
+.split-badge span { display: block; font-size: 11px; opacity: 0.9; }
+.split-badge strong { display: block; font-size: 14px; margin-top: 2px; }
+
 .method-breakdown-btn { background: rgba(0,0,0,0.12); border: none; width: 100%; border-radius: 12px; padding: 11px 14px; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 10px; transition: background 0.2s; }
 .method-breakdown-btn:active { background: rgba(0,0,0,0.2); }
 .budget-box { background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px; margin-top: 12px; }
@@ -89,8 +97,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <p>ยอดค้างรอบบิลปัจจุบัน (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
       
-      <!-- ส่วนแสดงยอดหนี้รายบุคคลแบบปุ่มเต็มความกว้าง -->
-      <div id="personSummary" style="margin-bottom: 10px;"></div>
+      <!-- 🌟 ส่วนแสดงยอดหนี้รายบุคคลแบบ Badge ยืดหยุ่น จัดเรียงขึ้นลงสะอาดตา (ไม่มีเลื่อนแนวนอน) -->
+      <div class="split-badges" id="personSummary"></div>
 
       <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
         <span>💳 เช็กยอดหนี้แยกตามช่องทาง</span>
@@ -213,7 +221,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 <!-- Modals ต่างๆ -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- Modal รายละเอียดรายบุคคล (ปรับให้ยุบรวมเป็น Accordion กดดูแยกตามช่องทางแบบสะอาดตา) -->
+<!-- Modal รายละเอียดรายบุคคล (แสดงผลแบบ Accordion แยกตามช่องทาง) -->
 <div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -946,7 +954,7 @@ function toggleChannelAccordion(id) {
 
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// 🌟 ปรับปรุงหน้าต่างรายละเอียดรายบุคคล ให้แสดงผลเป็น Accordion แบ่งตามช่องทางและกดพับ/ขยายได้สะอาดตา
+// หน้าต่างรายละเอียดรายบุคคล (แสดงผลแบบ Accordion แยกตามช่องทาง)
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
@@ -1085,7 +1093,7 @@ function render(){
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
                 </div>
-              `;
+              </div>`;
     }).join("");
   } else {
     entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
@@ -1094,13 +1102,14 @@ function render(){
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
+  // 🌟 เรนเดอร์ยอดหนี้รายบุคคลให้ออกมาเป็น Badge ดีไซน์เดิมที่สะอาดตา จัดเรียงขึ้นลง (Flex Wrap) ไม่มีเลื่อนแนวนอน และยังกดดูรายละเอียดได้
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
   document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
     let dat = pD[p] || { rm: 0 }; 
-    return `<button class="method-breakdown-btn" onclick="openPersonDetail('${p}')">
-              <span>👤 ยอดหนี้ของ ${esc(p)}</span>
+    return `<div class="split-badge" onclick="openPersonDetail('${p}')">
+              <span>👤 ${esc(p)}</span>
               <strong style="color:${dat.rm > 0 ? '#ffdddd' : '#ffffff'}">฿${money(dat.rm)}</strong>
-            </button>`; 
+            </div>`; 
   }).join("");
 
   let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).remain, 0); 
