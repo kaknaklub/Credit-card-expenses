@@ -882,7 +882,6 @@ function openMethodBreakdownModal() {
     if (matchCycle) { 
       const eff = getEffectiveItemData(x, k); 
       if(!breakdown[m]) breakdown[m] = { total: 0, items: [] }; 
-      // 🌟 ใช้ยอดคงเหลือ (eff.remain) แทนยอดเต็ม เพื่อให้ยอดหนี้ในช่องทางลดลงเมื่อถูกชำระแล้ว
       breakdown[m].total += eff.remain; 
       breakdown[m].items.push({ item: x.item, owner: x.owner, amount: eff.amount, remain: eff.remain }); 
     }
@@ -1087,7 +1086,9 @@ function render(){
     return `<div class="split-badge" onclick="openPersonDetail('${p}')"><span>👤 ${esc(p)}</span><strong style="color:${dat.rm > 0 ? '#ffebeb' : '#ffffff'}">฿${money(dat.rm)}</strong></div>`; 
   }).join("");
 
-  let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).amount, 0); 
+  // 🌟 ปรับปรุงให้ยอดใช้จ่ายในงบรวม (totalSpentInCycle) คิดจากยอดหนี้คงเหลือที่ยังไม่เคลียร์ (eff.remain) 
+  // ทำให้เมื่อจ่ายหนี้แล้ว ยอดหนี้ลดลง งบเหลือใช้ (budgetRemain) จะเพิ่มขึ้นตามความเป็นจริงแบบเรียลไทม์
+  let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).remain, 0); 
   let budgetLimit = localSettings.budgets[k] || 0; 
   let budgetRemain = budgetLimit - totalSpentInCycle; 
   let percent = budgetLimit > 0 ? Math.min(100, (totalSpentInCycle / budgetLimit) * 100) : 0;
