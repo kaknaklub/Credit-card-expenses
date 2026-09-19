@@ -123,7 +123,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
     <div class="input-group"><label>รายการ / สินค้า</label><input id="item" type="text" placeholder="เช่น ค่ากาแฟ, Shopee..."></div>
-    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="autoCalculateInterest()"></div>
     <div class="input-group">
       <label>ใครเป็นคนจ่าย / ของใคร?</label>
       <div class="radio-segments">
@@ -164,8 +164,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
     <div id="addInstallmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
-      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="5"></div>
-      <div class="input-group"><label>ยอดผ่อนชำระต่องวด (บาท)</label><input id="addPerMonth" type="number" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="5" oninput="autoCalculateInterest()"></div>
+      <div class="input-group"><label>ยอดผ่อนชำระต่องวด (บาท)</label><input id="addPerMonth" type="number" min="0" step="0.01" placeholder="0.00" oninput="autoCalculateInterest()"></div>
       <div class="input-group">
         <label>รูปแบบการคิดดอกเบี้ย</label>
         <div class="radio-segments">
@@ -173,8 +173,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
           <label><input type="radio" name="interestType" value="baht" onchange="toggleInterestInput()"><span>ระบุยอดดอกเบี้ย (บาท)</span></label>
         </div>
       </div>
-      <div class="input-group" id="interestPercentContainer"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="addInterestPercent" type="number" min="0" step="0.01" value="0"></div>
-      <div class="input-group hidden" id="interestBahtContainer"><label>ยอดดอกเบี้ยรวมตลอดสัญญา (บาท)</label><input id="addInterestBaht" type="number" min="0" step="0.01" value="0"></div>
+      <div class="input-group" id="interestPercentContainer"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="addInterestPercent" type="number" min="0" step="0.01" value="0" oninput="onPercentInput()"></div>
+      <div class="input-group hidden" id="interestBahtContainer"><label>ยอดดอกเบี้ยรวมตลอดสัญญา (บาท)</label><input id="addInterestBaht" type="number" min="0" step="0.01" value="0" oninput="onBahtInput()"></div>
       <div class="input-group" style="margin-bottom:0;"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="addStartDate" type="date"></div>
     </div>
     <div id="txNoContainer" class="hidden">
@@ -200,7 +200,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 <div class="modal" id="convertInstModal" onclick="if(event.target===this)closeConvertInstModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 เปลี่ยนรายการนี้เป็นยอดผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="convertInstItemName">-</div><div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="ciMonths" type="number" min="2" max="60" value="10"></div><div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0"></div><div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="ciStartDate" type="date"></div><button class="btn-main" style="margin-top:10px;" onclick="confirmConvertToInstallment()">ยืนยันสร้างตารางผ่อน</button><input type="hidden" id="convertEntryId"></div></div>
 <div class="modal" id="reportModal" onclick="if(event.target===this)closeReportModal()"><div class="sheet" style="max-width: 800px; height: 88vh; padding: 22px 16px;"><div class="grabber"></div><h3 style="margin:0 0 12px; font-size:20px; text-align:center">สรุปรายการพรีเมียม</h3><div style="font-size:12.5px; color:var(--text-muted); text-align:center; margin-bottom: 12px;"><span id="reportCycleLabel"></span></div><input type="text" id="reportSearchInput" class="report-search" placeholder="🔍 ค้นหา..." oninput="filterVisualReport()"><div style="overflow-x: auto; background: var(--bg); border-radius: 16px; padding: 10px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light); max-height: 55vh;"><div id="reportContent"></div></div><button class="btn-main" style="margin-top:20px" onclick="closeReportModal()">ปิดหน้าต่างนี้</button></div></div>
 <div class="modal" id="budgetModal" onclick="if(event.target===this)closeBudgetModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">🎯 กำหนดงบประมาณ</h3><div class="input-group"><label>งบรวมสำหรับรอบบิลนี้ (บาท)</label><input id="budgetInputAmt" type="number" min="0" step="1"></div><button class="btn-main" onclick="saveBudgetGoal()">บันทึกงบประมาณ</button></div></div>
-<div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
+<div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ดอกเบี้ยรวม: <strong id="instInterestVal" style="color:var(--danger)">฿0.00</strong></span><span>อัตราดอกเบี้ย: <strong id="instPercentVal">0% ต่อปี</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">บันทึกการชำระคืน</h3><div style="background:var(--bg); border-radius:20px; padding:20px; text-align:center; margin-bottom:24px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);"><div style="font-size:13.5px; color:var(--text-muted); margin-bottom:6px" id="repayItemName"></div><div style="font-size:11.5px; color:var(--text-muted);">ยอดคงค้าง</div><div id="repayRemainAmt" style="font-size:30px; font-weight:700; color:var(--danger)">฿0.00</div></div><div class="input-group"><label>วันที่โอน</label><input id="repayDate" type="date"></div><div class="input-group"><label>ยอดเงินที่โอน</label><input id="repayInputAmt" type="number" min="0" step="0.01"></div><div class="input-group"><label>📷 แนบสลิป</label><input id="repayImg" type="file" accept="image/*"></div><div style="display:flex; gap:12px; margin-top:10px"><button class="btn-main" style="flex:1; background:var(--bg); color:var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="fillFullRepay()">เติมยอดเต็ม</button><button class="btn-main" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button></div><input type="hidden" id="repayEntryId"></div></div>
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิล</h3><div style="max-height: 60vh; overflow-y: auto;" id="channelSettingsList"></div><button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่า</button></div></div>
 <div class="modal" id="imgViewerModal" onclick="closeImgViewer()"><div class="sheet"><img id="fullViewImg" src=""></div></div>
@@ -214,6 +214,55 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
+
+// 🌟 ระบบคำนวณดอกเบี้ยแบบ Two-way (คำนวณกลับไปกลับมาระหว่าง % กับ บาท)
+function autoCalculateInterest() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const perMonth = Number(document.getElementById('addPerMonth').value) || 0;
+  const intType = document.querySelector('input[name="interestType"]:checked').value;
+
+  if (principal > 0 && months > 0 && perMonth > 0) {
+    let totalToPay = perMonth * months;
+    let totalInterest = totalToPay - principal;
+    if (totalInterest < 0) totalInterest = 0;
+
+    if (intType === 'baht') {
+      document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+      // คำนวณ % ต่อปีกลับไป
+      let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+      document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
+    } else {
+      document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+      let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+      document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
+    }
+  }
+}
+
+function onPercentInput() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const annualPercent = Number(document.getElementById('addInterestPercent').value) || 0;
+  if (principal > 0 && months > 0) {
+    let totalInterest = principal * (annualPercent / 100) * (months / 12);
+    document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+    let totalToPay = principal + totalInterest;
+    document.getElementById('addPerMonth').value = (totalToPay / months).toFixed(2);
+  }
+}
+
+function onBahtInput() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const totalInterest = Number(document.getElementById('addInterestBaht').value) || 0;
+  if (principal > 0 && months > 0) {
+    let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+    document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
+    let totalToPay = principal + totalInterest;
+    document.getElementById('addPerMonth').value = (totalToPay / months).toFixed(2);
+  }
+}
 
 function importJSON() {
   try {
@@ -246,14 +295,18 @@ function importJSON() {
       else if (data.schedules && data.schedules.length > 0 && data.schedules[0].dueDate) { document.getElementById('addStartDate').value = data.schedules[0].dueDate; } 
       else if(data.date) { document.getElementById('addStartDate').value = data.date; }
 
-      let principal = 0; let calculatedInterestBaht = 0;
-      if (data.interestBaht !== undefined && data.interestBaht > 0) { calculatedInterestBaht = data.interestBaht; principal = (data.amount || (data.perMonth * data.addMonths)) - calculatedInterestBaht; } 
-      else { principal = data.amount || (data.perMonth ? data.perMonth * data.addMonths : 0); }
+      let principal = Number(data.amount) || 0;
+      let calculatedInterestBaht = Number(data.interestBaht) || 0;
+      if(principal === 0 && data.perMonth) {
+        let totalSum = data.perMonth * data.addMonths;
+        principal = totalSum - calculatedInterestBaht;
+      }
       
       document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : "";
-      document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
+      document.querySelector(`input[name="interestType"][value="percent"]`).checked = true;
       toggleInterestInput();
-      document.getElementById('addInterestBaht').value = calculatedInterestBaht.toFixed(2);
+      document.getElementById('addInterestPercent').value = (Number(data.annualInterest) || 0).toFixed(2);
+      onPercentInput();
       window._importedSchedules = data.schedules || null;
     } else {
       document.querySelector(`input[name="txType"][value="normal"]`).checked = true; toggleTxType();
@@ -276,11 +329,6 @@ async function addEntry(){
     const orderNo = isTxVisible ? document.getElementById("orderNo").value.trim() : ""; const txNo = isTxVisible ? document.getElementById("txNo").value.trim() : "";
     const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
 
-    if(isInst && (!Number.isFinite(amount) || amount <= 0)) {
-      const months = Number(document.getElementById("addMonths").value) || 0; const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; const intType = document.querySelector('input[name="interestType"]:checked').value;
-      if(months > 0 && customPerMonth > 0) { let totalSum = customPerMonth * months; let interestBaht = intType === 'baht' ? (Number(document.getElementById("addInterestBaht").value) || 0) : 0; amount = totalSum - interestBaht; document.getElementById("amount").value = amount.toFixed(2); }
-    }
-
     if(!date || !item || !Number.isFinite(amount) || amount <= 0){ alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
     const file = document.getElementById("entryImg").files[0]; const b64Img = await compressImage(file);
@@ -288,10 +336,14 @@ async function addEntry(){
     let entryData = { date, item, amount, owner, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [], isInstallment: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
 
     if (isInst) {
-      const months = Number(document.getElementById("addMonths").value) || 5; const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; const intType = document.querySelector('input[name="interestType"]:checked').value;
-      let totalInterest = 0; let annualInterest = 0;
-      if(intType === 'baht') { totalInterest = Number(document.getElementById("addInterestBaht").value) || 0; } else { annualInterest = Number(document.getElementById("addInterestPercent").value) || 0; totalInterest = amount * (annualInterest / 100) * (months / 12); }
-      let totalToPay = amount + totalInterest; let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); let schedules = [];
+      const months = Number(document.getElementById("addMonths").value) || 5; 
+      const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; 
+      const annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
+      const totalInterest = Number(document.getElementById("addInterestBaht").value) || (amount * (annualInterest / 100) * (months / 12));
+      
+      let totalToPay = amount + totalInterest; 
+      let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); 
+      let schedules = [];
       let [y, m, d] = (document.getElementById("addStartDate").value || date).split("-").map(Number);
       
       for(let i=1; i<=months; i++) {
@@ -379,7 +431,23 @@ async function confirmRepay(){
 function deleteRepay(eid, rid){ if(confirm("ลบประวัติการชำระคืน?")){ const e = entries.find(x => x.id === eid); const updatedRepayments = e.repayments.filter(r => r.id !== rid); db.collection("entries").doc(eid).update({ repayments: updatedRepayments }); } }
 
 let currentInstEntryId = null;
-function openInstallmentModal(id) { const e = entries.find(x => x.id === id); if(!e || !e.installmentPlan) return; currentInstEntryId = id; const plan = e.installmentPlan; document.getElementById("instModalTitle").textContent = `${e.item} (${plan.months} งวด)`; document.getElementById("instPerMonthVal").textContent = "฿" + money(plan.perMonth); document.getElementById("instTotalVal").textContent = "฿" + money(plan.totalToPay); let paidCount = plan.schedules.filter(s => s.paid).length; document.getElementById("instPaidVal").textContent = `${paidCount} งวด`; document.getElementById("instRemainVal").textContent = `${plan.months - paidCount} งวด`; renderInstSchedules(plan.schedules); document.getElementById("installmentModal").classList.add("open"); }
+function openInstallmentModal(id) {
+  const e = entries.find(x => x.id === id); if(!e || !e.installmentPlan) return; currentInstEntryId = id; const plan = e.installmentPlan;
+  document.getElementById("instModalTitle").textContent = `${e.item} (${plan.months} งวด)`; 
+  document.getElementById("instPerMonthVal").textContent = "฿" + money(plan.perMonth); 
+  document.getElementById("instTotalVal").textContent = "฿" + money(plan.totalToPay);
+  
+  let principal = Number(e.amount) || 0;
+  let totalInterest = Number(plan.totalToPay) - principal;
+  if(totalInterest < 0) totalInterest = 0;
+  document.getElementById("instInterestVal").textContent = "฿" + money(totalInterest);
+  document.getElementById("instPercentVal").textContent = (plan.annualInterest || 0).toFixed(2) + "% ต่อปี";
+
+  let paidCount = plan.schedules.filter(s => s.paid).length; 
+  document.getElementById("instPaidVal").textContent = `${paidCount} งวด`; 
+  document.getElementById("instRemainVal").textContent = `${plan.months - paidCount} งวด`; 
+  renderInstSchedules(plan.schedules); document.getElementById("installmentModal").classList.add("open");
+}
 function closeInstModal() { document.getElementById("installmentModal").classList.remove("open"); currentInstEntryId = null; }
 function renderInstSchedules(schedules) { let html = `<table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; schedules.forEach(s => { html += `<tr><td><strong>งวดที่ ${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary);">จ่ายแล้ว ✓</span>' : '<span style="color:var(--danger)">รอจ่าย</span>'}</td><td><button class="btn-main" style="padding:4px 8px; font-size:11px; border-radius:6px;" onclick="toggleInstPay(${s.no})">${s.paid ? 'ยกเลิก' : 'จ่ายงวดนี้'}</button></td></tr>`; }); document.getElementById("instSchedulesList").innerHTML = html + `</table>`; }
 async function toggleInstPay(no) { const e = entries.find(x => x.id === currentInstEntryId); if(!e || !e.installmentPlan) return; let plan = e.installmentPlan; plan.schedules = plan.schedules.map(s => s.no === no ? { ...s, paid: !s.paid } : s); await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); openInstallmentModal(currentInstEntryId); }
@@ -458,7 +526,7 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html + `</table>`;
 }
 
-// 🌟 ฟังก์ชันส่งออก CSV เฉพาะรอบบิลที่เลือก พร้อมรายละเอียดการผ่อนชำระ
+// 🌟 ฟังก์ชันส่งออก CSV เฉพาะรอบบิลที่เลือก พร้อมรายละเอียดการผ่อนชำระและดอกเบี้ยสมบูรณ์
 function exportToCSV() {
   const k = document.getElementById("cycleSelect").value;
   if (!k) { alert("กรุณาเลือกรอบบิลก่อนครับ"); return; }
@@ -468,15 +536,15 @@ function exportToCSV() {
   entries.forEach(x => { 
     let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      // ตรวจสอบว่างวดใดบ้างที่ตรงกับรอบบิลที่เลือกอยู่ปัจจุบัน
       x.installmentPlan.schedules.forEach(s => { 
         if (keyFromDateForMethod(s.dueDate, m) === k) {
           let principal = Number(x.amount) || 0;
           let totalToPay = Number(x.installmentPlan.totalToPay) || 0;
           let totalInterest = totalToPay - principal;
           if (totalInterest < 0) totalInterest = 0;
+          let annualInterest = Number(x.installmentPlan.annualInterest) || 0;
           
-          let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${x.installmentPlan.annualInterest}%, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
+          let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${annualInterest.toFixed(2)}% ต่อปี, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
 
           flatList.push({ 
             sortDate: s.dueDate, 
