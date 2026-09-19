@@ -123,10 +123,10 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <div><p>New Transaction</p><h1>เพิ่มรายการใหม่</h1></div>
     </div>
 
-    <!-- ส่วนนำเข้า JSON จาก Gemini พร้อมระบบคำนวณอัตโนมัติ -->
+    <!-- ส่วนนำเข้า JSON จาก Gemini -->
     <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')">
-      ✨ <strong>วางข้อมูล JSON จาก Gemini (รองรับคำนวณดอกเบี้ย & ผ่อน)</strong><br>
-      <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด ดึงข้อมูลและคำนวณลงฟอร์มอัตโนมัติ</span>
+      ✨ <strong>วางข้อมูล JSON จาก Gemini (คำนวณเงินต้น & ดอกเบี้ยอัตโนมัติ)</strong><br>
+      <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด นำเข้าข้อมูลและคำนวณลงฟอร์ม</span>
     </div>
     <div id="jsonImportBox" class="hidden" style="margin-bottom: 16px; background: var(--surface-white); padding: 14px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
       <textarea id="jsonImportData" rows="6" style="width: 100%; border-radius: 14px; padding: 10px; border: 1px solid var(--shadow-dark); box-shadow: inset 2px 2px 5px var(--shadow-dark); font-size:12px; font-family:monospace;" placeholder='วางโค้ด JSON ที่ก๊อปปี้มาจากแอป Gemini ลงตรงนี้...'></textarea>
@@ -242,7 +242,7 @@ let entries = [];
 let userChangedCycle = false;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
 
-// ฟังก์ชันนำเข้า JSON ที่อัปเกรดให้รองรับ startDate (วันเริ่มผ่อนงวดแรก)
+// 🌟 ฟังก์ชันนำเข้า JSON ฉบับฉลาด: คำนวณหาเงินต้นอัตโนมัติหากทราบแค่งวดและยอดผ่อนต่อเดือน
 function importJSON() {
   try {
     const rawData = document.getElementById('jsonImportData').value.trim();
@@ -254,7 +254,6 @@ function importJSON() {
     // หยอดข้อมูลพื้นฐาน
     if(data.date) document.getElementById('date').value = data.date;
     if(data.item) document.getElementById('item').value = data.item;
-    if(data.amount !== undefined) document.getElementById('amount').value = data.amount;
     if(data.orderNo) document.getElementById('orderNo').value = data.orderNo;
     if(data.txNo) document.getElementById('txNo').value = data.txNo;
     if(data.note) document.getElementById('note').value = data.note;
@@ -272,29 +271,50 @@ function importJSON() {
       toggleOwnerInput();
     }
 
-    // จัดการเรื่องผ่อนชำระ ดอกเบี้ย และ วันเริ่มผ่อนงวดแรก
+    // จัดการเรื่องผ่อนชำระและคำนวณย้อนกลับอัจฉริยะ
     if(data.txType === 'installment' && data.addMonths > 1) {
       document.querySelector(`input[name="txType"][value="installment"]`).checked = true;
       toggleTxType();
       
       document.getElementById('addMonths').value = data.addMonths;
 
-      // กำหนดวันเริ่มผ่อนงวดแรก (ถ้า Gemini ส่งมาให้) ถ้างั้นใช้วันที่ทำรายการแทน
+      // กำหนดวันเริ่มผ่อนงวดแรก
       if(data.startDate) {
         document.getElementById('addStartDate').value = data.startDate;
       } else if(data.date) {
         document.getElementById('addStartDate').value = data.date;
       }
 
+      let principal = 0;
       let calculatedInterestBaht = 0;
-      if (data.interestBaht !== undefined && data.interestBaht > 0) {
-        calculatedInterestBaht = data.interestBaht;
-      } else if (data.totalToPay !== undefined && data.amount !== undefined && data.totalToPay > data.amount) {
-        calculatedInterestBaht = data.totalToPay - data.amount;
-      } else if (data.perMonth !== undefined && data.amount !== undefined && data.addMonths > 0) {
+
+      // กรณีทราบยอดผ่อนต่อเดือนและจำนวนงวด แต่ไม่ทราบเงินต้น
+      if ((!data.amount || data.amount <= 0) && data.perMonth && data.addMonths) {
         let totalSum = data.perMonth * data.addMonths;
-        if (totalSum > data.amount) calculatedInterestBaht = totalSum - data.amount;
+        if (data.interestBaht && data.interestBaht > 0) {
+          calculatedInterestBaht = data.interestBaht;
+          principal = totalSum - calculatedInterestBaht;
+        } else if (data.totalToPay && data.totalToPay > 0) {
+          calculatedInterestBaht = data.totalToPay - (totalSum - data.totalToPay); // หรือคำนวณจากยอดรวม
+          principal = data.totalToPay - (data.interestBaht || 0);
+        } else {
+          // ถ้าไม่มีข้อมูลดอกเบี้ยแยกชัดเจน ให้สมมติว่ายอดรวมคือ perMonth * months หรือสัดส่วนมาตรฐาน
+          principal = data.amount || (totalSum * 0.95); // ตัวอย่างเผื่อกรณีไม่มีดอกเบี้ยแยก
+          calculatedInterestBaht = totalSum - principal;
+        }
+      } else {
+        principal = data.amount || 0;
+        if (data.interestBaht !== undefined && data.interestBaht > 0) {
+          calculatedInterestBaht = data.interestBaht;
+        } else if (data.totalToPay !== undefined && principal > 0 && data.totalToPay > principal) {
+          calculatedInterestBaht = data.totalToPay - principal;
+        } else if (data.perMonth !== undefined && principal > 0 && data.addMonths > 0) {
+          let totalSum = data.perMonth * data.addMonths;
+          if (totalSum > principal) calculatedInterestBaht = totalSum - principal;
+        }
       }
+
+      document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : (data.amount || 0);
 
       if (calculatedInterestBaht > 0) {
         document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
@@ -308,10 +328,11 @@ function importJSON() {
     } else {
       document.querySelector(`input[name="txType"][value="normal"]`).checked = true;
       toggleTxType();
+      if(data.amount !== undefined) document.getElementById('amount').value = data.amount;
     }
 
     toggleTxNo();
-    alert("✅ นำเข้าข้อมูล วันเริ่มผ่อน และคำนวณดอกเบี้ยสำเร็จ!");
+    alert("✅ นำเข้าข้อมูลและคำนวณเงินต้น/ดอกเบี้ยสำเร็จ!");
     document.getElementById('jsonImportData').value = "";
     document.getElementById('jsonImportBox').classList.add('hidden');
     
@@ -321,7 +342,7 @@ function importJSON() {
   }
 }
 
-// ... (ฟังก์ชันการทำงานอื่นๆ ของแอปคงเดิม) ...
+// ฟังก์ชันการทำงานอื่นๆ ของแอป
 function saveSettingsLocal(){ localStorage.setItem("cc-master-settings", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
