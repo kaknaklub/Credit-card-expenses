@@ -123,7 +123,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
     <div class="input-group"><label>รายการ / สินค้า</label><input id="item" type="text" placeholder="เช่น ค่ากาแฟ, Shopee..."></div>
-    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="autoCalculateInterest()"></div>
+    <div class="input-group"><label>ยอดเงินซื้อสินค้าจริง / เงินต้น (฿)</label><input id="amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="autoCalculateInterest(); onAmountChangeForSplit();"></div>
     <div class="input-group">
       <label>ใครเป็นคนจ่าย / ของใคร?</label>
       <div class="radio-segments">
@@ -134,6 +134,20 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
     <div class="input-group hidden" id="ownerCustomContainer"><input id="ownerCustom" type="text" placeholder="ระบุชื่อ..."></div>
+    
+    <!-- 🌟 ส่วนกำหนดสัดส่วนการหารแบบ Custom (แสดงเมื่อเลือก Nu & B) -->
+    <div id="customSplitContainer" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
+      <label style="font-size:12.5px; font-weight:600; margin-bottom:6px; display:block;">สัดส่วนการหาร (Nu & B)</label>
+      <div class="radio-segments" style="margin-bottom:10px;">
+        <label><input type="radio" name="splitMode" value="percent" checked onchange="toggleSplitMode()"><span>เปอร์เซ็นต์ (%)</span></label>
+        <label><input type="radio" name="splitMode" value="amount" onchange="toggleSplitMode()"><span>ยอดเงิน (฿)</span></label>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="flex:1;"><label style="font-size:11px;">Nu</label><input id="splitNuInput" type="number" step="0.01" value="50" oninput="onSplitInput('Nu')"></div>
+        <div style="flex:1;"><label style="font-size:11px;">B</label><input id="splitBInput" type="number" step="0.01" value="50" oninput="onSplitInput('B')"></div>
+      </div>
+    </div>
+
     <div class="input-group">
       <label>ช่องทางจ่าย</label>
       <select id="method" onchange="toggleTxNo()">
@@ -335,6 +349,59 @@ function onBahtInput() {
   }
 }
 
+// 🌟 ฟังก์ชันจัดการคำนวณสัดส่วน Custom Split อัตโนมัติ (Percent / Amount)
+function toggleSplitMode() {
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  const nuInput = document.getElementById('splitNuInput');
+  const bInput = document.getElementById('splitBInput');
+
+  if (mode === 'percent') {
+    nuInput.value = 50;
+    bInput.value = 50;
+  } else {
+    let half = totalAmt / 2;
+    nuInput.value = half.toFixed(2);
+    bInput.value = half.toFixed(2);
+  }
+}
+
+function onAmountChangeForSplit() {
+  const owner = document.querySelector('input[name="owner"]:checked').value;
+  if (owner !== "Nu & B") return;
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  if (mode === 'amount') {
+    let nuVal = Number(document.getElementById('splitNuInput').value) || 0;
+    document.getElementById('splitBInput').value = Math.max(0, totalAmt - nuVal).toFixed(2);
+  }
+}
+
+function onSplitInput(changed) {
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  const nuInput = document.getElementById('splitNuInput');
+  const bInput = document.getElementById('splitBInput');
+
+  if (mode === 'percent') {
+    let nuVal = Number(nuInput.value) || 0;
+    let bVal = Number(bInput.value) || 0;
+    if (changed === 'Nu') {
+      bInput.value = Math.max(0, 100 - nuVal).toFixed(2);
+    } else {
+      nuInput.value = Math.max(0, 100 - bVal).toFixed(2);
+    }
+  } else {
+    let nuVal = Number(nuInput.value) || 0;
+    let bVal = Number(bInput.value) || 0;
+    if (changed === 'Nu') {
+      bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
+    } else {
+      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2);
+    }
+  }
+}
+
 function importJSON() {
   try {
     const rawData = document.getElementById('jsonImportData').value.trim();
@@ -407,10 +474,20 @@ async function addEntry(){
     const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
 
     if(!date || !item || !Number.isFinite(amount) || amount <= 0){ alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
+    
+    // จัดเก็บข้อมูล Split ถ้าเป็น Nu & B
+    let splitDetails = null;
+    if (owner === "Nu & B") {
+      const mode = document.querySelector('input[name="splitMode"]:checked').value;
+      const nuVal = Number(document.getElementById('splitNuInput').value) || 50;
+      const bVal = Number(document.getElementById('splitBInput').value) || 50;
+      splitDetails = { mode, Nu: nuVal, B: bVal };
+    }
+
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
     const file = document.getElementById("entryImg").files[0]; const b64Img = await compressImage(file);
     
-    let entryData = { date, item, amount, owner, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [], isInstallment: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+    let entryData = { date, item, amount, owner, splitDetails, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [], isInstallment: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
 
     if (isInst) {
       const months = Number(document.getElementById("addMonths").value) || 5; 
@@ -486,7 +563,16 @@ function cycleLabel(k){
 
 function allKeys(){ let keysSet = new Set(); const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`); keysSet.add(nowKey); entries.forEach(x => { let m = x.method || "CreditCard"; if(x.date) keysSet.add(keyFromDateForMethod(x.date, m)); if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) { x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(keyFromDateForMethod(s.dueDate, m)); }); } }); return Array.from(keysSet).sort().reverse(); }
 function refreshCycles(){ let ks = allKeys(); const s = document.getElementById("cycleSelect"); const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`); const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]); s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join(""); if(ks.includes(targetKey)) s.value = targetKey; }
-function toggleOwnerInput(){ document.getElementById("ownerCustomContainer").classList.toggle('hidden', document.querySelector('input[name="owner"]:checked').value !== "Other"); }
+
+function toggleOwnerInput(){ 
+  const ownerVal = document.querySelector('input[name="owner"]:checked').value;
+  document.getElementById("ownerCustomContainer").classList.toggle('hidden', ownerVal !== "Other"); 
+  document.getElementById("customSplitContainer").classList.toggle('hidden', ownerVal !== "Nu & B");
+  if (ownerVal === "Nu & B") {
+    toggleSplitMode();
+  }
+}
+
 function toggleTxType(){ const isInst = document.querySelector('input[name="txType"]:checked').value === "installment"; document.getElementById("addInstallmentBox").classList.toggle('hidden', !isInst); }
 function toggleInterestInput(){ const isBaht = document.querySelector('input[name="interestType"]:checked').value === "baht"; document.getElementById("interestPercentContainer").classList.toggle('hidden', isBaht); document.getElementById("interestBahtContainer").classList.toggle('hidden', !isBaht); }
 function toggleTxNo(){ const m = document.getElementById("method").value.toLowerCase(); const c = document.getElementById("category").value.toLowerCase(); const isOnline = m.includes("shopee") || m.includes("spaylater") || m.includes("lazada") || c.includes("shopee") || c.includes("ออนไลน์"); document.getElementById("txNoContainer").classList.toggle('hidden', !isOnline); document.getElementById("catCustomContainer").classList.toggle('hidden', document.getElementById("category").value !== "อื่นๆ"); }
@@ -529,7 +615,6 @@ function getEffectiveItemData(e, selectedCycleKey) {
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
 }
 
-// 🌟 ฟังก์ชันเปิดหน้าต่างบันทึกชำระคืน (รองรับทั้งแบบระบุตัวคน และแบบไม่ระบุคนเพื่อเลือกใน Modal)
 function openRepayModal(id, forcedPayer = null){ 
   const e = entries.find(x => x.id === id); if(!e) return; 
   curRepayId = id; 
@@ -545,11 +630,9 @@ function openRepayModal(id, forcedPayer = null){
   const payerSelect = document.getElementById("repayPayerSelect");
 
   if (forcedPayer) {
-    // กรณีคลิกชำระจากหน้าของบุคคลนั้นๆ ล็อกคนจ่ายตามบุคคลนั้นทันที (ซ่อน Dropdown หรือเลือกให้อัตโนมัติ)
     payerSelect.value = forcedPayer;
     payerGroup.style.display = "none";
   } else {
-    // กรณีคลิกชำระจากหน้ารวม ให้แสดง Dropdown เลือกคนจ่าย
     payerGroup.style.display = "block";
     payerSelect.innerHTML = `<option value="Nu">Nu</option><option value="B">B</option>`;
   }
@@ -565,7 +648,7 @@ async function confirmRepay(){
   try {
     const date = document.getElementById("repayDate").value; 
     const amt = Number(document.getElementById("repayInputAmt").value);
-    const payer = document.getElementById("repayPayerSelect").value; // ผู้ชำระคืน
+    const payer = document.getElementById("repayPayerSelect").value; 
     const e = entries.find(x => x.id === curRepayId); 
 
     if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
@@ -705,7 +788,7 @@ function toggleChannelAccordion(id) {
 
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// 🌟 ฟังก์ชันเปิดดูรายละเอียดบุคคล (กดชำระยอดค้าง และล็อกคนจ่ายตามชื่อบุคคลนั้นๆ ทันที)
+// 🌟 ฟังก์ชันคำนวณและแสดงรายละเอียดบุคคลตามสัดส่วนจริง (แยกกระเป๋าใครกระเป๋ามมันอย่างแท้จริง)
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
@@ -714,21 +797,47 @@ function openPersonDetail(personName) {
   const matchedEntries = entries.filter(x => { 
     let m = x.method || "CreditCard"; 
     let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : (keyFromDateForMethod(x.date, m) === k); 
-    return inCycle && (x.owner === personName || x.owner === "Nu & B"); 
+    let isOwnerMatch = (x.owner === personName) || ((x.owner === "Nu & B" || x.owner === "Nu and B") && (personName === "Nu" || personName === "B"));
+    return inCycle && isOwnerMatch; 
   });
 
   let totalSpent = 0; let totalPaid = 0; let totalRemain = 0; let methodGroups = {};
+
   matchedEntries.forEach(x => {
     const eff = getEffectiveItemData(x, k); 
     if (!eff.isInstActiveInCycle && x.isInstallment) return;
-    let multiplier = (x.owner === "Nu & B") ? 0.5 : 1.0; 
-    let itemSpent = eff.amount * multiplier; 
-    let itemRemain = eff.remain * multiplier; 
+
+    let isSplit = (x.owner === "Nu & B" || x.owner === "Nu and B");
+    let shareMultiplier = 0.5;
+
+    if (isSplit && x.splitDetails) {
+      let mode = x.splitDetails.mode;
+      if (mode === 'percent') {
+        let p = Number(x.splitDetails[personName]) || 50;
+        shareMultiplier = p / 100;
+      } else {
+        let exactAmt = Number(x.splitDetails[personName]) || (eff.amount / 2);
+        shareMultiplier = eff.amount > 0 ? (exactAmt / eff.amount) : 0.5;
+      }
+    }
+
+    let itemSpent = eff.amount * shareMultiplier;
+
+    let ownerPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
+    let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
+    if (!isSplit && unassignedPaid > 0) ownerPaid += unassignedPaid;
+    if (isSplit && unassignedPaid > 0) ownerPaid += (unassignedPaid * shareMultiplier);
+
+    let itemRemain = Math.max(0, itemSpent - ownerPaid);
     let itemPaid = itemSpent - itemRemain;
-    totalSpent += itemSpent; totalRemain += itemRemain; totalPaid += itemPaid;
+
+    totalSpent += itemSpent; 
+    totalRemain += itemRemain; 
+    totalPaid += itemPaid;
+
     let m = x.method || "CreditCard"; 
     if(!methodGroups[m]) methodGroups[m] = []; 
-    methodGroups[m].push({ ...x, itemSpent, itemRemain });
+    methodGroups[m].push({ ...x, itemSpent, itemPaid, itemRemain });
   });
 
   let html = ""; 
@@ -774,32 +883,101 @@ function render(){
   if(document.getElementById("cycleSelect").options.length > 0) document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   checkDueAlerts(k);
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
-  let tR = 0; let pD = {}; 
-  document.getElementById("entriesList").innerHTML = es.length ? es.map(x => {
-    const eff = getEffectiveItemData(x, k); tR += eff.remain;
-    let ownerKey = x.owner; if(!pD[ownerKey]) pD[ownerKey] = { s: 0, p: 0, rm: 0 }; pD[ownerKey].s += eff.amount; pD[ownerKey].p += eff.repaid; pD[ownerKey].rm += eff.remain;
-    if(x.owner === "Nu & B") { ['Nu', 'B'].forEach(pName => { if(!pD[pName]) pD[pName] = { s: 0, p: 0, rm: 0 }; pD[pName].s += eff.amount * 0.5; pD[pName].p += eff.repaid * 0.5; pD[pName].rm += eff.remain * 0.5; }); }
-    
-    // แสดงประวัติการชำระคืน (พร้อมระบุว่าใครเป็นคนชำระ)
-    let hHtml = ""; 
-    if(x.repayments && x.repayments.length > 0) {
-      hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;"><span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span><div><strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong><button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button></div></div>`).join("")}</div>`;
-    }
+  
+  let tR = 0; 
+  let pD = {
+    "Nu": { s: 0, p: 0, rm: 0 },
+    "B": { s: 0, p: 0, rm: 0 }
+  }; 
 
-    const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
-    let instBadge = ""; let m = x.method || "CreditCard";
-    if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
-    else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
-    
-    let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
+  let entriesHtml = "";
+  if (es.length > 0) {
+    entriesHtml = es.map(x => {
+      const eff = getEffectiveItemData(x, k); 
+      tR += eff.remain;
 
-    return `<div class="entry-card" id="card-${x.id}"><div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="viewImage('${x.image}')"` : ''}>${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}</div><div class="entry-details"><h4>${esc(x.item)}</h4><p>${fmtDate(x.date)} • ${changeOwnerBtn}</p><div class="entry-meta"><span class="badge">${esc(x.method)}</span> ${orderH} ${txH} ${instBadge}</div>${hHtml}</div><div class="entry-right"><button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button><h4>฿${money(eff.amount)}</h4>${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}</div></div>`;
-  }).join("") : `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
+      let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+      
+      owners.forEach(ownerName => {
+        if (!pD[ownerName]) pD[ownerName] = { s: 0, p: 0, rm: 0 };
+        
+        let shareAmt = eff.amount / owners.length;
+        if (owners.length === 2 && x.splitDetails) {
+          let mode = x.splitDetails.mode;
+          if (mode === 'percent') {
+            let p = Number(x.splitDetails[ownerName]) || 50;
+            shareAmt = eff.amount * (p / 100);
+          } else {
+            let exactAmt = Number(x.splitDetails[ownerName]) || (eff.amount / 2);
+            shareAmt = exactAmt;
+          }
+        }
+        
+        let ownerPaid = (x.repayments || []).filter(r => r.payer === ownerName).reduce((sum, r) => sum + r.amount, 0);
+        let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
+        
+        if (owners.length === 1 && unassignedPaid > 0) ownerPaid += unassignedPaid;
+        if (owners.length === 2 && unassignedPaid > 0) {
+          let ratio = eff.amount > 0 ? (shareAmt / eff.amount) : 0.5;
+          ownerPaid += (unassignedPaid * ratio);
+        }
+
+        let ownerRemain = Math.max(0, shareAmt - ownerPaid);
+
+        pD[ownerName].s += shareAmt;
+        pD[ownerName].p += ownerPaid;
+        pD[ownerName].rm += ownerRemain;
+      });
+
+      let hHtml = ""; 
+      if(x.repayments && x.repayments.length > 0) {
+        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;"><span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span><div><strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong><button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button></div></div>`).join("")}</div>`;
+      }
+
+      const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; 
+      const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
+      let instBadge = ""; let m = x.method || "CreditCard";
+      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
+      else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
+      
+      let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
+
+      return `<div class="entry-card" id="card-${x.id}">
+                <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="viewImage('${x.image}')"` : ''}>${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}</div>
+                <div class="entry-details">
+                  <h4>${esc(x.item)}</h4>
+                  <p>${fmtDate(x.date)} • ${changeOwnerBtn}</p>
+                  <div class="entry-meta"><span class="badge">${esc(x.method)}</span> ${orderH} ${txH} ${instBadge}</div>
+                  ${hHtml}
+                </div>
+                <div class="entry-right">
+                  <button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button>
+                  <h4>฿${money(eff.amount)}</h4>
+                  ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
+                </div>
+              </div>`;
+    }).join("");
+  } else {
+    entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
+  }
+
+  document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
-  let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B" && p !== "Nu & B"));
-  document.getElementById("personSummary").innerHTML = displayPersons.map(p => { let dat = pD[p] || { rm: 0 }; return `<div class="split-badge" onclick="openPersonDetail('${p}')"><span>👤 ${esc(p)}</span><strong style="color:${dat.rm > 0 ? '#ffebeb' : '#ffffff'}">฿${money(dat.rm)}</strong></div>`; }).join("");
-  let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).amount, 0); let budgetLimit = localSettings.budgets[k] || 0; let budgetRemain = budgetLimit - totalSpentInCycle; let percent = budgetLimit > 0 ? Math.min(100, (totalSpentInCycle / budgetLimit) * 100) : 0;
-  document.getElementById("budgetText").textContent = budgetLimit > 0 ? "฿" + money(budgetLimit) : "ยังไม่ตั้ง"; document.getElementById("budgetRemainText").textContent = budgetLimit > 0 ? "฿" + money(budgetRemain) : "฿0.00"; document.getElementById("budgetProgressBar").style.width = percent + "%";
+
+  let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
+  document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
+    let dat = pD[p] || { rm: 0 }; 
+    return `<div class="split-badge" onclick="openPersonDetail('${p}')"><span>👤 ${esc(p)}</span><strong style="color:${dat.rm > 0 ? '#ffebeb' : '#ffffff'}">฿${money(dat.rm)}</strong></div>`; 
+  }).join("");
+
+  let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).amount, 0); 
+  let budgetLimit = localSettings.budgets[k] || 0; 
+  let budgetRemain = budgetLimit - totalSpentInCycle; 
+  let percent = budgetLimit > 0 ? Math.min(100, (totalSpentInCycle / budgetLimit) * 100) : 0;
+  
+  document.getElementById("budgetText").textContent = budgetLimit > 0 ? "฿" + money(budgetLimit) : "ยังไม่ตั้ง"; 
+  document.getElementById("budgetRemainText").textContent = budgetLimit > 0 ? "฿" + money(budgetRemain) : "฿0.00"; 
+  document.getElementById("budgetProgressBar").style.width = percent + "%";
 }
 
 function openVisualReport() {
