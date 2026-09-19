@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.1</title>
+<title>Credit Card & Loan Master Pro V2.9.2</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -90,7 +90,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.1</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.2</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -270,7 +270,10 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span style="font-size:13px; font-weight:600;">เลือกรายการที่ต้องการเคลียร์หนี้:</span>
-        <button class="badge" style="cursor:pointer; background:var(--primary); color:#fff; border:none; padding:4px 8px;" onclick="toggleSelectAllBulk(true)">เลือกทั้งหมด</button>
+        <div>
+          <button class="badge" style="cursor:pointer; background:var(--primary); color:#fff; border:none; padding:4px 8px;" onclick="toggleSelectAllBulk(true)">เลือกทั้งหมด</button>
+          <button class="badge" style="cursor:pointer; background:var(--bg); color:var(--text-main); border:1px solid var(--shadow-dark); padding:4px 8px; margin-left:4px;" onclick="toggleSelectAllBulk(false)">ยกเลิกทั้งหมด</button>
+        </div>
       </div>
       <div style="max-height: 30vh; overflow-y: auto; padding-right:4px;" id="bulkItemsContainer"></div>
     </div>
@@ -280,6 +283,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <select id="bulkPayerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;">
         <option value="Nu">Nu</option>
         <option value="B">B</option>
+        <option value="Nu and B">Nu and B</option>
+        <option value="obligation">ชำระคืนตามภาระหน้าที่ของคนนั้น ๆ (แยกตามสัดส่วนค้างจริง)</option>
       </select>
     </div>
 
@@ -404,6 +409,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <select id="repayPayerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;">
         <option value="Nu">Nu</option>
         <option value="B">B</option>
+        <option value="Nu and B">Nu and B</option>
+        <option value="obligation">ชำระคืนตามภาระหน้าที่ของคนนั้น ๆ (แยกตามสัดส่วนค้างจริง)</option>
       </select>
     </div>
 
@@ -431,7 +438,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.1")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.2")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
@@ -538,8 +545,23 @@ async function confirmBulkRepay() {
         }
       }
 
-      const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
-      await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+      if (payer === "obligation") {
+        let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
+        let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
+        let newRepays = [];
+        if (nuBreak.remain > 0) {
+          newRepays.push({ id: Date.now().toString() + '_nu_' + Math.random().toString(36).substring(2,5), date, amount: nuBreak.remain, payer: "Nu", image: finalSlip });
+        }
+        if (bBreak.remain > 0) {
+          newRepays.push({ id: Date.now().toString() + '_b_' + Math.random().toString(36).substring(2,5), date, amount: bBreak.remain, payer: "B", image: finalSlip });
+        }
+        if (newRepays.length > 0) {
+          await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
+        }
+      } else {
+        const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
+        await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+      }
     }
 
     closeBulkConfirmModal();
@@ -624,7 +646,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.1`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.2`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -851,7 +873,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.1", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.2", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1099,7 +1121,12 @@ function openRepayModal(id, forcedPayer = null){
     payerGroup.style.display = "none";
   } else {
     payerGroup.style.display = "block";
-    payerSelect.innerHTML = `<option value="Nu">Nu</option><option value="B">B</option>`;
+    payerSelect.innerHTML = `
+      <option value="Nu">Nu</option>
+      <option value="B">B</option>
+      <option value="Nu and B">Nu and B</option>
+      <option value="obligation">ชำระคืนตามภาระหน้าที่ของคนนั้น ๆ (แยกตามสัดส่วนค้างจริง)</option>
+    `;
   }
 
   document.getElementById("repayModal").classList.add("open"); 
@@ -1152,8 +1179,32 @@ async function confirmRepay(){
       } 
     }
 
-    const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; 
-    await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); 
+    if (payer === "obligation") {
+      let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
+      let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
+      let totalRemainObligation = nuBreak.remain + bBreak.remain;
+
+      let newRepays = [];
+      if (totalRemainObligation > 0) {
+        let effectiveAmt = Math.min(amt, totalRemainObligation);
+        let nuPay = effectiveAmt * (nuBreak.remain / totalRemainObligation);
+        let bPay = effectiveAmt * (bBreak.remain / totalRemainObligation);
+
+        if (nuPay > 0.005) {
+          newRepays.push({ id: Date.now().toString() + '_nu', date, amount: Number(nuPay.toFixed(2)), payer: "Nu", image: b64Img });
+        }
+        if (bPay > 0.005) {
+          newRepays.push({ id: Date.now().toString() + '_b', date, amount: Number(bPay.toFixed(2)), payer: "B", image: b64Img });
+        }
+      }
+      if (newRepays.length > 0) {
+        await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
+      }
+    } else {
+      const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; 
+      await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); 
+    }
+
     closeRepayModal();
   } catch (err) { alert("เกิดข้อผิดพลาด"); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; }
 }
