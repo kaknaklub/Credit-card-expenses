@@ -305,6 +305,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 
 let entries = [];
 let userChangedCycle = false;
+let currentForcedPayer = null;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } };
 
 // ฟังก์ชันคำนวณดอกเบี้ย Two-way
@@ -396,7 +397,7 @@ function onSplitInput(changed) {
     if (changed === 'Nu') {
       bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     } else {
-      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2); // Fixed bug here
+      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2);
     }
   }
 }
@@ -612,56 +613,7 @@ function getEffectiveItemData(e, selectedCycleKey) {
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
 }
 
-// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละคนอย่างแม่นยำ (สอดคล้องทั้งหน้าหลักและหน้าต่างรายละเอียด)
-function getPersonItemBreakdown(x, selectedCycleKey, personName) {
-  let m = x.method || "CreditCard";
-  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
-  if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
-
-  let totalSpent = 0;
-  let totalPaid = 0;
-  let totalRemain = 0;
-
-  if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-    let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
-    matchingSchedules.forEach(s => {
-      let scheduleTotal = s.amount;
-      let pShare = getShareForPerson(x, scheduleTotal, personName);
-      totalSpent += pShare;
-
-      let schedulePaid = s.paid ? pShare : 0;
-      let manualPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
-      let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
-
-      let ratio = scheduleTotal > 0 ? (pShare / scheduleTotal) : 0.5;
-      let totalPaidByOwner = schedulePaid + manualPaid + (unassignedPaid * ratio);
-      let remain = Math.max(0, pShare - totalPaidByOwner);
-
-      totalPaid += (pShare - remain);
-      totalRemain += remain;
-    });
-  } else {
-    let cycleKey = keyFromDateForMethod(x.date, m);
-    if (cycleKey === selectedCycleKey) {
-      let eff = getEffectiveItemData(x, selectedCycleKey);
-      let pShare = getShareForPerson(x, eff.amount, personName);
-      totalSpent += pShare;
-
-      let manualPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
-      let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
-
-      let isSplit = owners.length === 2;
-      let ratio = eff.amount > 0 ? (pShare / eff.amount) : 0.5;
-      let totalPaidByOwner = manualPaid + (isSplit ? unassignedPaid * ratio : unassignedPaid);
-
-      let remain = Math.max(0, pShare - totalPaidByOwner);
-      totalPaid += (pShare - remain);
-      totalRemain += remain;
-    }
-  }
-  return { spent: totalSpent, paid: totalPaid, remain: totalRemain };
-}
-
+// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละบุคคลพร้อมระบบกระจายยอดชำระส่วนกลางอย่างสมบูรณ์
 function getShareForPerson(x, totalAmt, personName) {
   let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
   if (!owners.includes(personName)) return 0;
@@ -683,13 +635,134 @@ function getShareForPerson(x, totalAmt, personName) {
   }
 }
 
+function calculateShareBreakdown(totalAmt, shares, repayments) {
+  let personKeys = Object.keys(shares);
+  let result = {};
+  personKeys.forEach(p => {
+    result[p] = { spent: shares[p], paid: 0, remain: shares[p] };
+  });
+
+  let totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0);
+  
+  // ถ้ายอดชำระรวมครอบคลุมยอดทั้งหมดแล้ว เคลียร์ทุกฝ่ายเป็น 0 ทันที
+  if (totalRepaid >= totalAmt - 0.005) {
+    personKeys.forEach(p => {
+      result[p].paid = shares[p];
+      result[p].remain = 0;
+    });
+    return result;
+  }
+
+  // 1. จัดสรรยอดชำระตามรายชื่อผู้ชำระจำเพาะเจาะจง (Payer) ก่อน
+  personKeys.forEach(p => {
+    let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
+    let allocatedToP = Math.min(shares[p], directForP);
+    result[p].paid += allocatedToP;
+    result[p].remain = Math.max(0, shares[p] - result[p].paid);
+  });
+
+  // 2. จัดสรรยอดชำระแบบไม่ระบุผู้ชำระ (Unassigned) ตามสัดส่วนภาระหนี้คงเหลือ
+  let unassigned = repayments.filter(r => !r.payer || r.payer === "").reduce((sum, r) => sum + r.amount, 0);
+  if (unassigned > 0) {
+    let totalRemainNeeded = personKeys.reduce((sum, p) => sum + result[p].remain, 0);
+    if (totalRemainNeeded > 0) {
+      personKeys.forEach(p => {
+        let shareOfUnassigned = unassigned * (result[p].remain / totalRemainNeeded);
+        let actualAlloc = Math.min(result[p].remain, shareOfUnassigned);
+        result[p].paid += actualAlloc;
+        result[p].remain = Math.max(0, shares[p] - result[p].paid);
+      });
+    }
+  }
+
+  // 3. จัดสรรส่วนเกินหากมีคนจ่ายเกินภาระของตัวเอง ไปช่วยโปะยอดค้างของคนอื่นในรายการเดียวกัน
+  personKeys.forEach(p => {
+    let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
+    let excess = directForP - shares[p];
+    if (excess > 0) {
+      let otherPersons = personKeys.filter(other => other !== p && result[other].remain > 0);
+      let totalOtherRemain = otherPersons.reduce((sum, other) => sum + result[other].remain, 0);
+      if (totalOtherRemain > 0) {
+        otherPersons.forEach(other => {
+          let cover = Math.min(result[other].remain, excess * (result[other].remain / totalOtherRemain));
+          result[other].paid += cover;
+          result[other].remain = Math.max(0, shares[other] - result[other].paid);
+        });
+      }
+    }
+  });
+
+  personKeys.forEach(p => {
+    result[p].paid = Math.min(shares[p], result[p].paid);
+    result[p].remain = Math.max(0, shares[p] - result[p].paid);
+  });
+
+  return result;
+}
+
+function getPersonItemBreakdown(x, selectedCycleKey, personName) {
+  let m = x.method || "CreditCard";
+  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+  if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
+
+  let totalSpent = 0;
+  let totalPaid = 0;
+  let totalRemain = 0;
+
+  if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+    let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
+    matchingSchedules.forEach(s => {
+      let scheduleTotal = s.amount;
+      let shares = {};
+      owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); });
+      
+      let scheduleRepayments = [...(x.repayments || [])].map(r => ({
+        amount: r.amount / matchingSchedules.length,
+        payer: r.payer
+      }));
+      if (s.paid) {
+        scheduleRepayments.push({ amount: scheduleTotal, payer: "" });
+      }
+
+      let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
+      totalSpent += breakdown[personName].spent;
+      totalPaid += breakdown[personName].paid;
+      totalRemain += breakdown[personName].remain;
+    });
+  } else {
+    let cycleKey = keyFromDateForMethod(x.date, m);
+    if (cycleKey === selectedCycleKey) {
+      let eff = getEffectiveItemData(x, selectedCycleKey);
+      let totalAmt = eff.amount;
+      let shares = {};
+      owners.forEach(o => { shares[o] = getShareForPerson(x, totalAmt, o); });
+
+      let breakdown = calculateShareBreakdown(totalAmt, shares, x.repayments || []);
+      totalSpent += breakdown[personName].spent;
+      totalPaid += breakdown[personName].paid;
+      totalRemain += breakdown[personName].remain;
+    }
+  }
+  return { spent: totalSpent, paid: totalPaid, remain: totalRemain };
+}
+
 function openRepayModal(id, forcedPayer = null){ 
   const e = entries.find(x => x.id === id); if(!e) return; 
   curRepayId = id; 
+  currentForcedPayer = forcedPayer;
   const currentCycleKey = document.getElementById("cycleSelect").value; 
-  const eff = getEffectiveItemData(e, currentCycleKey); 
-  document.getElementById("repayItemName").textContent = e.item; 
-  document.getElementById("repayRemainAmt").textContent = "฿" + money(eff.remain); 
+  
+  let remainDisplay = 0;
+  if (forcedPayer) {
+    let breakdown = getPersonItemBreakdown(e, currentCycleKey, forcedPayer);
+    remainDisplay = breakdown.remain;
+  } else {
+    const eff = getEffectiveItemData(e, currentCycleKey);
+    remainDisplay = eff.remain;
+  }
+
+  document.getElementById("repayItemName").textContent = e.item + (forcedPayer ? ` (${forcedPayer})` : ""); 
+  document.getElementById("repayRemainAmt").textContent = "฿" + money(remainDisplay); 
   document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`; 
   document.getElementById("repayInputAmt").value = ""; 
   document.getElementById("repayImg").value = ""; 
@@ -708,8 +781,19 @@ function openRepayModal(id, forcedPayer = null){
   document.getElementById("repayModal").classList.add("open"); 
 }
 
-function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
-function fillFullRepay(){ const e = entries.find(x => x.id === curRepayId); const eff = getEffectiveItemData(e, document.getElementById("cycleSelect").value); document.getElementById("repayInputAmt").value = eff.remain > 0 ? eff.remain : 0; }
+function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; currentForcedPayer = null; }
+
+function fillFullRepay(){ 
+  const e = entries.find(x => x.id === curRepayId); 
+  const currentCycleKey = document.getElementById("cycleSelect").value;
+  if (currentForcedPayer) {
+    let breakdown = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer);
+    document.getElementById("repayInputAmt").value = breakdown.remain > 0 ? breakdown.remain.toFixed(2) : "0.00";
+  } else {
+    const eff = getEffectiveItemData(e, currentCycleKey); 
+    document.getElementById("repayInputAmt").value = eff.remain > 0 ? eff.remain.toFixed(2) : "0.00"; 
+  }
+}
 
 async function confirmRepay(){
   const btn = document.getElementById("btnConfirmRepay"); if(!curRepayId) return;
@@ -718,15 +802,25 @@ async function confirmRepay(){
     const amt = Number(document.getElementById("repayInputAmt").value);
     const payer = document.getElementById("repayPayerSelect").value; 
     const e = entries.find(x => x.id === curRepayId); 
+    const currentCycleKey = document.getElementById("cycleSelect").value;
 
     if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
+
+    // 🌟 กฎเหล็ก: หากกดจ่ายจากหน้าจอรายละเอียดรายบุคคล ห้ามชำระเกินภาระหนี้ของตนเองเด็ดขาด
+    if (currentForcedPayer) {
+      let breakdown = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer);
+      if (amt > breakdown.remain + 0.005) {
+        alert(`❌ ไม่สามารถชำระเกินภาระหนี้ของตนเองได้ (สูงสุด ฿${money(breakdown.remain)}) หากต้องการชำระเกินหรือชำระแทน กรุณาชำระจากหน้าหลัก`);
+        return;
+      }
+    }
+
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
     
     const file = document.getElementById("repayImg").files[0]; 
     const b64Img = await compressImage(file);
 
     if (e.isInstallment && e.installmentPlan) { 
-      let currentCycleKey = document.getElementById("cycleSelect").value; 
       let m = e.method || "CreditCard"; 
       let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid); 
       if (targetSchedule) { 
