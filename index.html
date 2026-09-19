@@ -125,12 +125,12 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
     <!-- ส่วนนำเข้า JSON จาก Gemini -->
     <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')">
-      ✨ <strong>วางข้อมูล JSON จาก Gemini (นำเข้าแม่นยำ ไม่มั่วนิ่มดอกเบี้ย)</strong><br>
-      <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด นำเข้าข้อมูลและคำนวณลงฟอร์ม</span>
+      ✨ <strong>วางข้อมูล JSON จาก Gemini (ดึงสถานะ จ่ายแล้ว/ยังไม่จ่าย อัตโนมัติ)</strong><br>
+      <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด นำเข้าข้อมูลและสถานะแต่ละงวดลงฟอร์ม</span>
     </div>
     <div id="jsonImportBox" class="hidden" style="margin-bottom: 16px; background: var(--surface-white); padding: 14px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
       <textarea id="jsonImportData" rows="6" style="width: 100%; border-radius: 14px; padding: 10px; border: 1px solid var(--shadow-dark); box-shadow: inset 2px 2px 5px var(--shadow-dark); font-size:12px; font-family:monospace;" placeholder='วางโค้ด JSON ที่ก๊อปปี้มาจากแอป Gemini ลงตรงนี้...'></textarea>
-      <button class="btn-main" style="margin-top: 10px; padding: 12px; font-size: 14px;" onclick="importJSON()">⬇️ ดึงข้อมูลและใส่ฟอร์ม</button>
+      <button class="btn-main" style="margin-top: 10px; padding: 12px; font-size: 14px;" onclick="importJSON()">⬇️ ดึงข้อมูลและสถานะงวด</button>
     </div>
 
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
@@ -244,7 +244,7 @@ let entries = [];
 let userChangedCycle = false;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
 
-// 🌟 ฟังก์ชันนำเข้า JSON ฉบับแก้ไข: ไม่อุปโลกน์ดอกเบี้ย หากบิลไม่มีดอกเบี้ย
+// 🌟 ฟังก์ชันนำเข้า JSON ฉบับรองรับสถานะการจ่ายแต่ละงวด (paid: true/false)
 function importJSON() {
   try {
     const rawData = document.getElementById('jsonImportData').value.trim();
@@ -290,44 +290,36 @@ function importJSON() {
       let principal = 0;
       let calculatedInterestBaht = 0;
 
-      // เช็คว่ามีดอกเบี้ยหรือไม่ ถ้าใน JSON ส่งดอกเบี้ยมาเป็น 0 หรือไม่ส่ง ให้ดอกเบี้ยเป็น 0 ทันที
       if (data.interestBaht !== undefined && data.interestBaht > 0) {
         calculatedInterestBaht = data.interestBaht;
         principal = (data.amount || (data.perMonth * data.addMonths)) - calculatedInterestBaht;
-      } else if (data.annualInterest !== undefined && data.annualInterest > 0) {
-        let totalSum = data.perMonth ? (data.perMonth * data.addMonths) : (data.amount || 0);
-        calculatedInterestBaht = totalSum * (data.annualInterest / 100) * (data.addMonths / 12);
-        principal = totalSum - calculatedInterestBaht;
       } else {
-        // กรณีไม่มีดอกเบี้ย (เช่น SPayLater 0%) ดอกเบี้ยเป็น 0, เงินต้น = ยอดรวมทั้งหมด
         calculatedInterestBaht = 0;
         principal = data.amount || (data.perMonth ? data.perMonth * data.addMonths : 0);
       }
 
       document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : "";
 
-      if (calculatedInterestBaht > 0) {
-        document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
-        toggleInterestInput();
-        document.getElementById('addInterestBaht').value = calculatedInterestBaht.toFixed(2);
-      } else {
-        document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
-        toggleInterestInput();
-        document.getElementById('addInterestBaht').value = "0";
-      }
+      document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
+      toggleInterestInput();
+      document.getElementById('addInterestBaht').value = calculatedInterestBaht.toFixed(2);
+
+      // ถ้าใน JSON มีส่ง schedules มาพร้อมสถานะ paid (true/false) เราจะเก็บบันทึกไว้ใช้ตอนสร้าง entry
+      window._importedSchedules = data.schedules || null;
     } else {
       document.querySelector(`input[name="txType"][value="normal"]`).checked = true;
       toggleTxType();
       if(data.amount !== undefined) document.getElementById('amount').value = data.amount;
+      window._importedSchedules = null;
     }
 
     toggleTxNo();
-    alert("✅ นำเข้าข้อมูลสำเร็จ (ไม่มีการคำนวณดอกเบี้ยเกินจริง)");
+    alert("✅ นำเข้าข้อมูลและสถานะการจ่ายแต่ละงวดสำเร็จ!");
     document.getElementById('jsonImportData').value = "";
     document.getElementById('jsonImportBox').classList.add('hidden');
     
   } catch (error) {
-    alert("❌ รูปแบบ JSON ไม่ถูกต้อง! กรุณาตรวจสอบโค้ดที่ก๊อปปี้มาอีกครั้ง");
+    alert("❌ รูปแบบ JSON ไม่ถูกต้อง!");
     console.error(error);
   }
 }
@@ -390,10 +382,18 @@ async function addEntry(){
       let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); 
       let schedules = [];
       let [y, m, d] = (document.getElementById("addStartDate").value || date).split("-").map(Number);
+      
       for(let i=1; i<=months; i++) {
         let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate());
-        schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false });
+        let isPaid = false;
+        // หากมีข้อมูลสถานะที่นำมาจาก JSON ให้นำมาใช้ด้วย
+        if (window._importedSchedules && window._importedSchedules[i-1] !== undefined) {
+          isPaid = !!window._importedSchedules[i-1].paid;
+        }
+        schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: isPaid });
       }
+      window._importedSchedules = null; // ล้างค่าทิ้ง
+
       entryData.isInstallment = true;
       entryData.installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules };
     }
