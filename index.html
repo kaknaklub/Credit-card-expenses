@@ -312,6 +312,22 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
     </div>
     <div class="input-group hidden" id="catCustomContainer"><input id="catCustom" type="text" placeholder="ระบุหมวดหมู่เพิ่มเติม..."></div>
 
+    <!-- ส่วนเลือกประเภท: รายการปกติ หรือ ผ่อนชำระตั้งแต่แรก -->
+    <div class="input-group">
+      <label>รูปแบบการบันทึก</label>
+      <div class="radio-segments">
+        <label><input type="radio" name="txType" value="normal" checked onchange="toggleTxType()"><span>จ่ายปกติครั้งเดียว</span></label>
+        <label><input type="radio" name="txType" value="installment" onchange="toggleTxType()"><span>ผ่อนชำระหลายงวด</span></label>
+      </div>
+    </div>
+
+    <!-- ฟอร์มตั้งค่าผ่อนชำระ (ซ่อนไว้จนกว่าจะเลือกผ่อน) -->
+    <div id="addInstallmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
+      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="addMonths" type="number" min="2" max="60" value="10"></div>
+      <div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%) (ถ้ามี)</label><input id="addInterest" type="number" min="0" step="0.01" value="0" placeholder="0"></div>
+      <div class="input-group" style="margin-bottom:0;"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="addStartDate" type="date"></div>
+    </div>
+
     <div id="txNoContainer" class="hidden">
       <div class="input-group"><label>🛒 Order No.</label><input id="orderNo" type="text" placeholder="หมายเลขคำสั่งซื้อ"></div>
       <div class="input-group"><label>💳 Transaction No.</label><input id="txNo" type="text" placeholder="เลขอ้างอิงการจ่าย"></div>
@@ -549,7 +565,9 @@ function switchView(view) {
     document.getElementById('navHome').classList.remove('active');
     document.getElementById('navProfile').classList.remove('active');
     const now = new Date();
-    document.getElementById("date").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    document.getElementById("date").value = dateStr;
+    document.getElementById("addStartDate").value = dateStr;
   }
   window.scrollTo(0,0);
 }
@@ -610,7 +628,6 @@ async function scanReceiptWithAI(input) {
     const moneyRegex = /\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g;
     const matches = text.match(moneyRegex);
     if(matches && matches.length > 0) {
-      // เอาตัวเลขที่มากที่สุดในใบเสร็จมาเป็นยอดเงินรวม
       const cleanNumbers = matches.map(m => Number(m.replace(/,/g, '')));
       const maxAmount = Math.max(...cleanNumbers);
       document.getElementById('amount').value = maxAmount;
@@ -624,13 +641,20 @@ async function scanReceiptWithAI(input) {
       let m = pad(dateMatch[2]);
       let y = dateMatch[3];
       if(y.length === 2) y = "20" + y;
-      if(Number(y) > 2500) y = String(Number(y) - 543); // แปลงปี พ.ศ. เป็น ค.ศ.
-      document.getElementById('date').value = `${y}-${m}-${d}`;
+      if(Number(y) > 2500) y = String(Number(y) - 543);
+      const parsedDateStr = `${y}-${m}-${d}`;
+      document.getElementById('date').value = parsedDateStr;
+      document.getElementById('addStartDate').value = parsedDateStr;
     }
     
-    // ตั้งชื่อรายการเบื้องต้น
+    // ตรวจจับคำว่า "ผ่อน" หรือ "Installment" เพื่อสลับเป็นโหมดผ่อนให้อัตโนมัติถ้าเจอ
+    if(text.toLowerCase().includes("ผ่อน") || text.toLowerCase().includes("installment") || text.toLowerCase().includes("งวด")) {
+      document.querySelector('input[name="txType"][value="installment"]').checked = true;
+      toggleTxType();
+    }
+    
     document.getElementById('item').value = "สแกนจากใบเสร็จ (ตรวจสอบความถูกต้อง)";
-    alert("🤖 AI สแกนใบเสร็จสำเร็จ! ตรวจสอบความถูกต้องของข้อมูลแล้วกดบันทึกได้เลยครับ");
+    alert("🤖 AI สแกนใบเสร็จสำเร็จ! ตรวจสอบข้อมูลแล้วกดบันทึกได้เลยครับ");
     
   } catch (err) {
     alert("ไม่สามารถอ่านข้อความจากรูปภาพได้ กรุณากรอกข้อมูลเองครับ");
@@ -696,6 +720,10 @@ function refreshCycles(){
 
 // --- UI Toggles ---
 function toggleOwnerInput(){ document.getElementById("ownerCustomContainer").classList.toggle('hidden', document.querySelector('input[name="owner"]:checked').value !== "Other"); }
+function toggleTxType(){
+  const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
+  document.getElementById("addInstallmentBox").classList.toggle('hidden', !isInst);
+}
 function toggleTxNo(){
   const m = document.getElementById("method").value.toLowerCase(); const c = document.getElementById("category").value.toLowerCase();
   const isOnline = m.includes("shopee") || m.includes("spaylater") || m.includes("lazada") || c.includes("shopee") || c.includes("ออนไลน์");
@@ -713,7 +741,7 @@ function getIconForCategory(cat) {
   return "🏷️";
 }
 
-// --- Add Entry ---
+// --- Add Entry (Supports Direct Installments) ---
 async function addEntry(){
   const btn = document.getElementById("btnAddEntry");
   try {
@@ -734,16 +762,55 @@ async function addEntry(){
     const file = document.getElementById("entryImg").files[0];
     const b64Img = await compressImage(file);
     
+    const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
     let entryData = {
       date, item, amount, owner, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [],
       isInstallment: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
+
+    if (isInst) {
+      const months = Number(document.getElementById("addMonths").value) || 10;
+      const annualInterest = Number(document.getElementById("addInterest").value) || 0;
+      const startDateStr = document.getElementById("addStartDate").value || date;
+      
+      let totalToPay = amount;
+      if(annualInterest > 0) {
+        let totalInterest = amount * (annualInterest / 100) * (months / 12);
+        totalToPay = amount + totalInterest;
+      }
+      let perMonth = totalToPay / months;
+      
+      let schedules = [];
+      let [y, m, d] = startDateStr.split("-").map(Number);
+      
+      for(let i=1; i<=months; i++) {
+        let payDateObj = new Date(y, m - 1 + (i - 1), d);
+        let pY = payDateObj.getFullYear();
+        let pM = pad(payDateObj.getMonth() + 1);
+        let pD = pad(payDateObj.getDate());
+        let dateStr = `${pY}-${pM}-${pD}`;
+        
+        schedules.push({
+          no: i,
+          dueDate: dateStr,
+          amount: Number(perMonth.toFixed(2)),
+          paid: false
+        });
+      }
+
+      entryData.isInstallment = true;
+      entryData.installmentPlan = {
+        months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules
+      };
+    }
     
     await db.collection("entries").add(entryData);
     
     document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = "";
-    
+    document.querySelector('input[name="txType"][value="normal"]').checked = true;
+    toggleTxType();
+
     userChangedCycle = false;
     refreshCycles();
     switchView('home');
@@ -1353,11 +1420,10 @@ function exportStyledExcelWithSheetJS() {
   // เรียงลำดับวันที่จากอดีตไปปัจจุบัน (เดือน 9 ขึ้นก่อนเดือน 10)
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
-  // สร้างโครงสร้างข้อมูลสำหรับ SheetJS
   let wsData = [
     ["📊 รายงานสรุปค่าใช้จ่ายประจำรอบบิล"],
     [`รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ Credit Card & Loan Master Pro`],
-    [], // แถวเว้นว่าง
+    [],
     ["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"]
   ];
 
@@ -1378,7 +1444,6 @@ function exportStyledExcelWithSheetJS() {
   let wb = XLSX.utils.book_new();
   let ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  // ตกแต่งความกว้างคอลัมน์อัตโนมัติ
   ws['!cols'] = [
     {wch: 14}, {wch: 40}, {wch: 12}, {wch: 15}, {wch: 22}, {wch: 18}, {wch: 18}, {wch: 16}, {wch: 20}
   ];
@@ -1431,8 +1496,11 @@ function saveSettings(){
 function downloadBlob(b,n){ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=n; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
 
 function setup(){
-  const now = new Date(); document.getElementById("date").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  toggleOwnerInput(); toggleTxNo();
+  const now = new Date(); 
+  const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById("date").value = dateStr;
+  document.getElementById("addStartDate").value = dateStr;
+  toggleOwnerInput(); toggleTxNo(); toggleTxType();
 }
 setup();
 </script>
