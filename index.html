@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2</title>
+<title>Credit Card & Loan Master Pro V2.1</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -89,7 +89,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.1</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -135,6 +135,32 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
+    <!-- 🌟 นำกลับมาแล้ว: มินิแอปกระเป๋าเงินคู่รัก (Shared Wallet V1) -->
+    <div style="background: var(--surface-white); border-radius: 22px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="margin: 0; font-size: 16px; color: var(--text-main);">👥 กระเป๋าเงินคู่รัก (Shared Wallet)</h3>
+        <span style="font-size: 11px; background: var(--bg); padding: 3px 8px; border-radius: 6px; color: var(--primary-dark); font-weight: 600;">Active</span>
+      </div>
+      <div style="background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 18px; padding: 16px; color: #fff; margin-bottom: 12px;">
+        <p style="margin: 0; font-size: 12px; opacity: 0.9;">ยอดใช้จ่ายร่วมกัน (Nu & B) รอบนี้</p>
+        <h2 id="sharedTotalSpent" style="margin: 4px 0 10px; font-size: 24px; font-weight: 700;">฿0.00</h2>
+        <div style="display: flex; gap: 8px; background: rgba(0,0,0,0.1); padding: 8px 10px; border-radius: 12px; font-size: 12px;">
+          <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">
+            <span>Nu จ่ายไป</span>
+            <strong id="nuPaidSum" style="display: block; font-size: 13px; margin-top: 2px;">฿0.00</strong>
+          </div>
+          <div style="flex: 1; text-align: center;">
+            <span>B จ่ายไป</span>
+            <strong id="bPaidSum" style="display: block; font-size: 13px; margin-top: 2px;">฿0.00</strong>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-main" style="flex: 1; padding: 10px; font-size: 12.5px; border-radius: 12px;" onclick="switchView('add')">➕ เพิ่มบิลร่วม</button>
+        <button class="btn-main" style="flex: 1; padding: 10px; font-size: 12.5px; border-radius: 12px; background: var(--bg); color: var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="openMethodBreakdownModal()">💳 เช็กยอดตามช่องทาง</button>
+      </div>
+    </div>
+
     <div class="action-grid">
       <div class="action-btn"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
       <div class="action-btn" onclick="openBudgetModal()"><div class="icon">🎯</div><span>ตั้งงบ</span></div>
@@ -149,7 +175,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <div id="view-add" class="hidden">
     <div class="header-top"><div><p>New Transaction</p><h1>เพิ่มรายการใหม่</h1></div></div>
     
-    <!-- V2: AI Slip OCR Simulation Banner -->
+    <!-- AI Slip OCR Simulation -->
     <div class="ai-banner" onclick="simulateAiSlipScan()">
       ✨ <strong>📷 อัปโหลดสลิป & จำลองระบบ AI อ่านสลิปอัตโนมัติ</strong><br>
       <span style="font-size:11.5px; opacity:0.8;">แตะที่นี่เพื่อเลือกรูปสลิป/ใบเสร็จ แล้วให้ AI ดึงยอด วันที่ ร้านค้าให้อัตโนมัติ</span>
@@ -179,7 +205,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div class="input-group hidden" id="ownerCustomContainer"><input id="ownerCustom" type="text" placeholder="ระบุชื่อ..."></div>
     
-    <!-- V2: ส่วนกำหนดสัดส่วนการหารแบบยืดหยุ่นรายรายการ (Advanced Custom Split) -->
+    <!-- สัดส่วนการหารแบบยืดหยุ่นรายรายการ -->
     <div id="customSplitContainer" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <label style="font-size:12.5px; font-weight:600; margin-bottom:6px; display:block;">สัดส่วนการหารยืดหยุ่น (Nu & B)</label>
       <div class="radio-segments" style="margin-bottom:10px;">
@@ -255,7 +281,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 <!-- Modals ต่างๆ -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- V2: Modal จัดการเป้าหมายเงินออมร่วมกัน -->
+<!-- Modal จัดการเป้าหมายเงินออมร่วมกัน -->
 <div class="modal" id="savingsModal" onclick="if(event.target===this)closeSavingsModal()">
   <div class="sheet" style="max-width: 500px;">
     <div class="grabber"></div>
@@ -268,7 +294,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- V2: Modal กราฟสถิติเชิงลึกแยกตามหมวดหมู่ (Visual Analytics) -->
+<!-- Modal กราฟสถิติเชิงลึกแยกตามหมวดหมู่ -->
 <div class="modal" id="analyticsModal" onclick="if(event.target===this)closeAnalyticsModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -279,7 +305,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- V2: Modal ข้อความสรุปส่ง LINE -->
+<!-- Modal ข้อความสรุปส่ง LINE -->
 <div class="modal" id="lineShareModal" onclick="if(event.target===this)closeLineShareModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -385,13 +411,13 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.1")) || { 
   budgets: {}, 
   savingsGoal: { title: "ทริปเที่ยวด้วยกัน", target: 30000, current: 0 },
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
 
-// V2: AI Slip OCR Simulation
+// AI Slip OCR Simulation
 function simulateAiSlipScan() {
   document.getElementById('aiSlipInput').click();
 }
@@ -399,14 +425,11 @@ function simulateAiSlipScan() {
 function processAiSlipImage(input) {
   if (!input.files || !input.files[0]) return;
   const file = input.files[0];
-  
-  // แสดงสถานะกำลังวิเคราะห์
   const btnBanner = document.querySelector('.ai-banner');
   const originalHtml = btnBanner.innerHTML;
   btnBanner.innerHTML = `🤖 <strong>กำลังให้ AI วิเคราะห์สลิปและใบเสร็จ...</strong><br><span style="font-size:11.5px;">โปรดรอสักครู่ ระบบกำลังสกัดข้อมูลยอดเงินและรายการ</span>`;
   
   setTimeout(() => {
-    // จำลองผลการอ่านสลิปอัจฉริยะ (Mock Smart OCR Extraction)
     const mockVendors = ["Shopee Mall", "Central Department Store", "7-Eleven", "Grab Food", "Lazada Thailand", "Cafe Amazon"];
     const randomVendor = mockVendors[Math.floor(Math.random() * mockVendors.length)];
     const randomAmount = (Math.floor(Math.random() * 850) + 120).toFixed(2);
@@ -414,7 +437,6 @@ function processAiSlipImage(input) {
     document.getElementById('item').value = randomVendor;
     document.getElementById('amount').value = randomAmount;
     
-    // ตั้งค่าตัวแปรหารถ้าเป็น Nu & B
     onAmountChangeForSplit();
     autoCalculateInterest();
     
@@ -424,7 +446,7 @@ function processAiSlipImage(input) {
   }, 1200);
 }
 
-// V2: Savings Goal Modals & Actions
+// Savings Goal Modals & Actions
 function openSavingsModal() {
   const goal = localSettings.savingsGoal || { title: "ทริปเที่ยวด้วยกัน", target: 30000, current: 0 };
   document.getElementById('goalTitleInput').value = goal.title;
@@ -444,7 +466,7 @@ function saveSavingsGoal() {
   alert("✅ บันทึกเป้าหมายเงินออมสำเร็จ!");
 }
 
-// V2: Visual Analytics Modal
+// Visual Analytics Modal
 function openAnalyticsModal() {
   const k = document.getElementById("cycleSelect").value;
   document.getElementById("analyticsCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
@@ -487,7 +509,7 @@ function openAnalyticsModal() {
 }
 function closeAnalyticsModal() { document.getElementById("analyticsModal").classList.remove("open"); }
 
-// V2: LINE Share Text Modal
+// LINE Share Text Modal
 function openLineShareModal() {
   const k = document.getElementById("cycleSelect").value;
   const es = entries.filter(x => { 
@@ -516,7 +538,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.1`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -743,7 +765,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.1", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1260,6 +1282,10 @@ function render(){
     "B": { s: 0, p: 0, rm: 0 }
   }; 
 
+  let sharedSpent = 0;
+  let nuPaidSum = 0;
+  let bPaidSum = 0;
+
   let entriesHtml = "";
   if (es.length > 0) {
     entriesHtml = es.map(x => {
@@ -1267,6 +1293,16 @@ function render(){
       tR += eff.remain;
 
       let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+      
+      if (x.owner === "Nu & B" || x.owner === "Nu and B") {
+        sharedSpent += eff.amount;
+        if (x.repayments) {
+          x.repayments.forEach(r => {
+            if (r.payer === "Nu") nuPaidSum += r.amount;
+            if (r.payer === "B") bPaidSum += r.amount;
+          });
+        }
+      }
       
       owners.forEach(ownerName => {
         if (!pD[ownerName]) pD[ownerName] = { s: 0, p: 0, rm: 0 };
@@ -1311,6 +1347,11 @@ function render(){
 
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+
+  // อัปเดตข้อมูลมินิแอปกระเป๋าเงินคู่รัก (Shared Wallet V1)
+  document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent);
+  document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum);
+  document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
 
   // เรนเดอร์ยอดหนี้รายบุคคล
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
