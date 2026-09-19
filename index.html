@@ -89,7 +89,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <p>ยอดค้างรอบบิลปัจจุบัน (รอเคลียร์)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
       
-      <!-- 🌟 ส่วนแสดงยอดหนี้รายบุคคลแบบปุ่มเต็มความกว้างสะอาดตา -->
+      <!-- ส่วนแสดงยอดหนี้รายบุคคลแบบปุ่มเต็มความกว้าง -->
       <div id="personSummary" style="margin-bottom: 10px;"></div>
 
       <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
@@ -137,7 +137,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div class="input-group hidden" id="ownerCustomContainer"><input id="ownerCustom" type="text" placeholder="ระบุชื่อ..."></div>
     
-    <!-- 🌟 ส่วนกำหนดสัดส่วนการหารแบบ Custom (แสดงเมื่อเลือก Nu & B) -->
+    <!-- ส่วนกำหนดสัดส่วนการหารแบบ Custom -->
     <div id="customSplitContainer" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <label style="font-size:12.5px; font-weight:600; margin-bottom:6px; display:block;">สัดส่วนการหาร (Nu & B)</label>
       <div class="radio-segments" style="margin-bottom:10px;">
@@ -213,7 +213,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 <!-- Modals ต่างๆ -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- Modal รายละเอียดรายบุคคล (กดชำระยอดค้างได้) -->
+<!-- Modal รายละเอียดรายบุคคล (ปรับให้ยุบรวมเป็น Accordion กดดูแยกตามช่องทางแบบสะอาดตา) -->
 <div class="modal" id="personModal" onclick="if(event.target===this)closePersonModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -265,7 +265,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ดอกเบี้ยรวม: <strong id="instInterestVal" style="color:var(--danger)">฿0.00</strong></span><span>อัตราดอกเบี้ย: <strong id="instPercentVal">0% ต่อปี</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto; padding-right:4px;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
 
-<!-- Modal บันทึกการชำระคืน (พร้อมเลือกคนชำระคืนเมื่อกดจากหน้ารวม) -->
+<!-- Modal บันทึกการชำระคืน -->
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
   <div class="sheet">
     <div class="grabber"></div>
@@ -615,7 +615,6 @@ function getEffectiveItemData(e, selectedCycleKey) {
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
 }
 
-// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละบุคคลพร้อมระบบกระจายยอดชำระส่วนกลางอย่างสมบูรณ์
 function getShareForPerson(x, totalAmt, personName) {
   let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
   if (!owners.includes(personName)) return 0;
@@ -646,7 +645,6 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
 
   let totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0);
   
-  // ถ้ายอดชำระรวมครอบคลุมยอดทั้งหมดแล้ว เคลียร์ทุกฝ่ายเป็น 0 ทันที
   if (totalRepaid >= totalAmt - 0.005) {
     personKeys.forEach(p => {
       result[p].paid = shares[p];
@@ -655,7 +653,6 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
     return result;
   }
 
-  // 1. จัดสรรยอดชำระตามรายชื่อผู้ชำระจำเพาะเจาะจง (Payer) ก่อน
   personKeys.forEach(p => {
     let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
     let allocatedToP = Math.min(shares[p], directForP);
@@ -663,7 +660,6 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
     result[p].remain = Math.max(0, shares[p] - result[p].paid);
   });
 
-  // 2. จัดสรรยอดชำระแบบไม่ระบุผู้ชำระ (Unassigned) ตามสัดส่วนภาระหนี้คงเหลือ
   let unassigned = repayments.filter(r => !r.payer || r.payer === "").reduce((sum, r) => sum + r.amount, 0);
   if (unassigned > 0) {
     let totalRemainNeeded = personKeys.reduce((sum, p) => sum + result[p].remain, 0);
@@ -677,7 +673,6 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
     }
   }
 
-  // 3. จัดสรรส่วนเกินหากมีคนจ่ายเกินภาระของตัวเอง ไปช่วยโปะยอดค้างของคนอื่นในรายการเดียวกัน
   personKeys.forEach(p => {
     let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
     let excess = directForP - shares[p];
@@ -808,7 +803,6 @@ async function confirmRepay(){
 
     if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
 
-    // 🌟 กฎเหล็ก: หากกดจ่ายจากหน้าจอรายละเอียดรายบุคคล ห้ามชำระเกินภาระหนี้ของตนเองเด็ดขาด
     if (currentForcedPayer) {
       let breakdown = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer);
       if (amt > breakdown.remain + 0.005) {
@@ -900,7 +894,6 @@ function openMethodBreakdownModal() {
       let dat = breakdown[method] || { total: 0, items: [] };
       let chInfo = channels[method] || { cutoff: 17, due: 30, budget: 0 }; 
       let chBudget = Number(chInfo.budget) || 0;
-      let remainBudget = chBudget - dat.total;
       let percent = chBudget > 0 ? Math.min(100, (dat.total / chBudget) * 100) : 0;
       let collapseId = `collapse-${method}`;
       
@@ -953,6 +946,7 @@ function toggleChannelAccordion(id) {
 
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
+// 🌟 ปรับปรุงหน้าต่างรายละเอียดรายบุคคล ให้แสดงผลเป็น Accordion แบ่งตามช่องทางและกดพับ/ขยายได้สะอาดตา
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
@@ -976,17 +970,35 @@ function openPersonDetail(personName) {
     totalRemain += breakdown.remain;
 
     let m = x.method || "CreditCard"; 
-    if(!methodGroups[m]) methodGroups[m] = []; 
-    methodGroups[m].push({ ...x, itemSpent: breakdown.spent, itemPaid: breakdown.paid, itemRemain: breakdown.remain });
+    if(!methodGroups[m]) methodGroups[m] = { totalSpent: 0, totalRemain: 0, items: [] }; 
+    methodGroups[m].totalSpent += breakdown.spent;
+    methodGroups[m].totalRemain += breakdown.remain;
+    methodGroups[m].items.push({ ...x, itemSpent: breakdown.spent, itemPaid: breakdown.paid, itemRemain: breakdown.remain });
   });
 
   let html = ""; 
   if(Object.keys(methodGroups).length === 0) {
-    html = `<div style="text-align:center; padding:20px;">ไม่มีรายการค่าใช้จ่าย</div>`;
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่าย</div>`;
   } else { 
     for(let method in methodGroups) { 
-      html += `<div style="margin-bottom:16px; background:var(--bg); padding:12px; border-radius:14px; box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);"><div style="font-size:13.5px; font-weight:700; color:var(--primary-dark); margin-bottom:8px; border-bottom:1px solid var(--shadow-dark); padding-bottom:4px;">💳 ช่องทาง: ${esc(method)}</div>`; 
-      methodGroups[method].forEach(item => { 
+      let dat = methodGroups[method];
+      let collapseId = `person-collapse-${personName}-${method}`.replace(/\s+/g, '_');
+
+      html += `
+        <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <strong style="font-size:15px; color:var(--primary-dark)">💳 ช่องทาง: ${esc(method)} 🔽</strong>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ยอดรวมส่วนนี้: ฿${money(dat.totalSpent)}</div>
+            </div>
+            <div style="text-align:right;">
+              <strong style="font-size:15px; color:${dat.totalRemain > 0 ? 'var(--danger)' : 'var(--primary-dark)'}">฿${money(dat.totalRemain)}</strong>
+              <div style="font-size:10.5px; color:var(--text-muted);">ค้างชำระ</div>
+            </div>
+          </div>
+          <div id="${collapseId}" class="hidden" style="margin-top:10px; border-top:1px dashed var(--shadow-dark); padding-top:8px; font-size:12.5px;" onclick="event.stopPropagation()">`;
+
+      dat.items.forEach(item => { 
         let imgTag = item.image ? `<img src="${item.image}" style="width:32px; height:32px; border-radius:8px; object-fit:cover; cursor:pointer;" onclick="viewImage('${item.image}')">` : '<div style="width:32px; height:32px; border-radius:8px; background:var(--surface-white); display:flex; align-items:center; justify-content:center; font-size:14px;">🏷️</div>'; 
         
         let remainHtml = item.itemRemain > 0 
@@ -998,7 +1010,7 @@ function openPersonDetail(personName) {
                     ${imgTag}
                     <div>
                       <div style="font-size:13px; font-weight:600;">${esc(item.item)}</div>
-                      <div style="font-size:10.5px;">${fmtDate(item.date)}</div>
+                      <div style="font-size:10.5px; color:var(--text-muted);">${fmtDate(item.date)}</div>
                     </div>
                   </div>
                   <div style="text-align:right;">
@@ -1007,7 +1019,7 @@ function openPersonDetail(personName) {
                   </div>
                 </div>`; 
       }); 
-      html += `</div>`; 
+      html += `</div></div>`; 
     } 
   }
   document.getElementById("pModalTotal").textContent = "฿" + money(totalSpent); 
@@ -1073,7 +1085,7 @@ function render(){
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
                 </div>
-              </div>`;
+              `;
     }).join("");
   } else {
     entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
@@ -1082,7 +1094,6 @@ function render(){
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
-  // 🌟 เรนเดอร์ยอดหนี้รายบุคคลให้อยู่ในรูปแบบปุ่มเต็มความกว้าง (Full-width button style) สะอาดตาราวกับเมนูแยกตามช่องทาง
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
   document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
     let dat = pD[p] || { rm: 0 }; 
