@@ -211,7 +211,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">บันทึกการชำระคืน</h3><div style="background:var(--bg); border-radius:20px; padding:20px; text-align:center; margin-bottom:24px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);"><div style="font-size:13.5px; color:var(--text-muted); margin-bottom:6px" id="repayItemName"></div><div style="font-size:11.5px; color:var(--text-muted);">ยอดคงค้าง</div><div id="repayRemainAmt" style="font-size:30px; font-weight:700; color:var(--danger)">฿0.00</div></div><div class="input-group"><label>วันที่โอน</label><input id="repayDate" type="date"></div><div class="input-group"><label>ยอดเงินที่โอน</label><input id="repayInputAmt" type="number" min="0" step="0.01"></div><div class="input-group"><label>📷 แนบสลิป</label><input id="repayImg" type="file" accept="image/*"></div><div style="display:flex; gap:12px; margin-top:10px"><button class="btn-main" style="flex:1; background:var(--bg); color:var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="fillFullRepay()">เติมยอดเต็ม</button><button class="btn-main" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button></div><input type="hidden" id="repayEntryId"></div></div>
 
-<div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิล</h3><div style="max-height: 50vh; overflow-y: auto; padding-right:4px;" id="channelSettingsList"></div><button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่า</button></div></div>
+<div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิลและงบช่องทาง</h3><div style="max-height: 55vh; overflow-y: auto; padding-right:4px;" id="channelSettingsList"></div><button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่า</button></div></div>
 
 <div class="modal" id="imgViewerModal" onclick="closeImgViewer()"><div class="sheet"><img id="fullViewImg" src=""></div></div>
 
@@ -223,7 +223,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 
 let entries = [];
 let userChangedCycle = false;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } };
 
 // ฟังก์ชันคำนวณดอกเบี้ย Two-way
 function autoCalculateInterest() {
@@ -508,7 +508,7 @@ function closeBudgetModal() { document.getElementById("budgetModal").classList.r
 function saveBudgetGoal() { const k = document.getElementById("cycleSelect").value; localSettings.budgets[k] = Number(document.getElementById("budgetInputAmt").value) || 0; saveSettingsLocal(); closeBudgetModal(); render(); }
 function checkDueAlerts(currentCycleKey) { const banner = document.getElementById("dueAlertBanner"); const channels = localSettings.channels || {}; const currentDay = new Date().getDate(); let alerts = []; for(let method in channels) { let dueDay = Number(channels[method].due); let diff = dueDay - currentDay; if(diff >= 0 && diff <= 3) alerts.push(`ช่องทาง <b>${method}</b> ครบกำหนดชำระวันที่ ${dueDay} นี้ (เหลือ ${diff} วัน)`); } if(alerts.length > 0) { banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนกำหนดจ่ายด่วน:</strong><br>${alerts.join("<br>")}</div>`; banner.classList.remove("hidden"); } else { banner.classList.add("hidden"); } }
 
-// 🌟 ฟังก์ชันเปิดหน้าต่างสรุปช่องทางหนี้ (ทำเป็นระบบกดคลิกเพื่อพับ/ขยาย Accordion)
+// 🌟 ฟังก์ชันเปิดหน้าต่างสรุปช่องทางหนี้ พร้อมแสดงงบประมาณและการใช้จ่ายแยกตามช่องทาง
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("methodModalCycleLabel").textContent = `อิงรอบบิลหลัก: ${cycleLabel(k)}`;
@@ -528,14 +528,35 @@ function openMethodBreakdownModal() {
   });
 
   let html = ""; 
-  if (Object.keys(breakdown).length === 0) {
+  // แสดงทุกช่องทางที่มีการตั้งค่า หรือมีรายการ
+  let allChannelsSet = new Set(Object.keys(channels));
+  Object.keys(breakdown).forEach(m => allChannelsSet.add(m));
+
+  if (allChannelsSet.size === 0) {
     html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลในรอบบิลนี้</div>`;
   } else { 
-    for(let method in breakdown) { 
-      let dat = breakdown[method]; 
-      let chInfo = channels[method] || { cutoff: 17, due: 30 }; 
+    allChannelsSet.forEach(method => { 
+      let dat = breakdown[method] || { total: 0, items: [] };
+      let chInfo = channels[method] || { cutoff: 17, due: 30, budget: 0 }; 
+      let chBudget = Number(chInfo.budget) || 0;
+      let remainBudget = chBudget - dat.total;
+      let percent = chBudget > 0 ? Math.min(100, (dat.total / chBudget) * 100) : 0;
       let collapseId = `collapse-${method}`;
       
+      let budgetInfoHtml = "";
+      if (chBudget > 0) {
+        budgetInfoHtml = `
+          <div style="margin-top:8px; margin-bottom:8px; background:var(--surface-white); padding:8px 10px; border-radius:10px; font-size:12px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span>งบช่องทาง: <strong>฿${money(chBudget)}</strong></span>
+              <span>เหลือใช้: <strong style="color:${remainBudget >= 0 ? 'var(--primary-dark)' : 'var(--danger)'}">฿${money(remainBudget)}</strong></span>
+            </div>
+            <div style="width:100%; height:6px; background:var(--shadow-dark); border-radius:3px; overflow:hidden;">
+              <div style="width:${percent}%; height:100%; background:${percent > 100 ? 'var(--danger)' : 'var(--primary)'}; border-radius:3px;"></div>
+            </div>
+          </div>`;
+      }
+
       html += `
         <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -545,20 +566,24 @@ function openMethodBreakdownModal() {
             </div>
             <strong style="font-size:16px; color:var(--text-main)">฿${money(dat.total)}</strong>
           </div>
+          ${budgetInfoHtml}
           <div id="${collapseId}" class="hidden" style="margin-top:10px; border-top:1px dashed var(--shadow-dark); padding-top:8px; font-size:12.5px;" onclick="event.stopPropagation()">`;
       
-      dat.items.forEach(i => { 
-        html += `<div style="display:flex; justify-content:space-between; margin-bottom:6px; background:var(--surface-white); padding:6px 10px; border-radius:8px;"><span>• ${esc(i.item)} (${esc(i.owner)})</span><strong>฿${money(i.amount)}</strong></div>`; 
-      }); 
+      if (dat.items.length === 0) {
+        html += `<div style="text-align:center; padding:8px; color:var(--text-muted); font-size:12px;">ไม่มีรายการในช่องทางนี้</div>`;
+      } else {
+        dat.items.forEach(i => { 
+          html += `<div style="display:flex; justify-content:space-between; margin-bottom:6px; background:var(--surface-white); padding:6px 10px; border-radius:8px;"><span>• ${esc(i.item)} (${esc(i.owner)})</span><strong>฿${money(i.amount)}</strong></div>`; 
+        }); 
+      }
       
       html += `</div></div>`; 
-    } 
+    }); 
   }
   document.getElementById("methodBreakdownContent").innerHTML = html; 
   document.getElementById("methodBreakdownModal").classList.add("open");
 }
 
-// ฟังก์ชันกดพับ/ขยาย Accordion แต่ละช่องทาง
 function toggleChannelAccordion(id) {
   const el = document.getElementById(id);
   if(el) {
@@ -734,14 +759,48 @@ function exportToCSV() {
 }
 
 function openSettings(){ 
-  let html = ""; const channels = localSettings.channels || {}; const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
-  channelNames.forEach(ch => { let dat = channels[ch] || { cutoff: 17, due: 30 }; html += `<div style="background:var(--bg); padding:12px; border-radius:14px; margin-bottom:12px;"><strong>🏷️ ${ch}</strong><div style="display:flex; gap:10px; margin-top:8px;"><div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${ch}" value="${dat.cutoff}" min="1" max="28"></div><div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${ch}" value="${dat.due}" min="1" max="31"></div></div></div>`; });
-  document.getElementById("channelSettingsList").innerHTML = html; document.getElementById("settingsModal").classList.add("open"); 
+  let html = ""; 
+  const channels = localSettings.channels || {}; 
+  const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
+  
+  channelNames.forEach(ch => { 
+    let dat = channels[ch] || { cutoff: 17, due: 30, budget: 0 }; 
+    html += `
+      <div style="background:var(--bg); padding:14px; border-radius:14px; margin-bottom:14px;">
+        <strong>🏷️ ${ch}</strong>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${ch}" value="${dat.cutoff}" min="1" max="28"></div>
+          <div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${ch}" value="${dat.due}" min="1" max="31"></div>
+        </div>
+        <div style="margin-top:10px;">
+          <label style="font-size:11px;">งบประมาณช่องทางนี้ (บาท)</label>
+          <input type="number" id="budget-${ch}" value="${dat.budget || 0}" min="0" step="1" placeholder="0">
+        </div>
+      </div>`; 
+  });
+  
+  document.getElementById("channelSettingsList").innerHTML = html; 
+  document.getElementById("settingsModal").classList.add("open"); 
 }
+
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
+
 function saveSettings(){ 
-  let newChannels = {}; ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { newChannels[ch] = { cutoff: Number(document.getElementById(`cutoff-${ch}`).value)||17, due: Number(document.getElementById(`due-${ch}`).value)||30 }; });
-  localSettings.channels = newChannels; saveSettingsLocal(); closeSettings(); userChangedCycle = false; refreshCycles(); render(); alert("บันทึกการตั้งค่าสำเร็จ!");
+  let newChannels = {}; 
+  ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { 
+    newChannels[ch] = { 
+      cutoff: Number(document.getElementById(`cutoff-${ch}`).value)||17, 
+      due: Number(document.getElementById(`due-${ch}`).value)||30,
+      budget: Number(document.getElementById(`budget-${ch}`).value)||0
+    }; 
+  });
+  localSettings.channels = newChannels; 
+  saveSettingsLocal(); 
+  closeSettings(); 
+  userChangedCycle = false; 
+  refreshCycles(); 
+  render(); 
+  alert("✅ บันทึกการตั้งค่าสำเร็จ!");
 }
 
 function setup(){
