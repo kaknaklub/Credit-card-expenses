@@ -7,8 +7,6 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
-<!-- SheetJS -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 :root { --bg: #f2f6f4; --surface-white: #ffffff; --primary: #7ea88a; --primary-light: #9bc2a6; --primary-dark: #5e8469; --text-main: #233128; --text-muted: #7a9082; --danger: #e26d6d; --shadow-light: #ffffff; --shadow-dark: #d5e2da; }
@@ -105,7 +103,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div class="action-grid">
       <div class="action-btn"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
       <div class="action-btn" onclick="openBudgetModal()"><div class="icon">🎯</div><span>ตั้งงบ</span></div>
-      <div class="action-btn" onclick="exportStyledExcelWithSheetJS()"><div class="icon">📊</div><span>ชีท Excel</span></div>
+      <div class="action-btn" onclick="exportToCSV()"><div class="icon">📊</div><span>ส่งออก CSV</span></div>
       <div class="action-btn" onclick="openVisualReport()"><div class="icon">🖼️</div><span>สรุปพรีเมียม</span></div>
     </div>
     <div class="section-title"><h3>รายการประจำรอบบิล</h3><span id="cycleLabelText">รอบปัจจุบัน</span></div>
@@ -115,7 +113,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: ADD ENTRY ================= -->
   <div id="view-add" class="hidden">
     <div class="header-top"><div><p>New Transaction</p><h1>เพิ่มรายการใหม่</h1></div></div>
-    <!-- ส่วนนำเข้า JSON จาก Gemini -->
     <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')">
       ✨ <strong>วางข้อมูล JSON จาก Gemini (ดึงสถานะ จ่ายแล้ว/ยังไม่จ่าย อัตโนมัติ)</strong><br>
       <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด นำเข้าข้อมูลและสถานะแต่ละงวดลงฟอร์ม</span>
@@ -461,33 +458,111 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html + `</table>`;
 }
 
-// 🌟 ฟังก์ชันส่งออก Excel แบบมีสไตล์และฟิลเตอร์
-function exportStyledExcelWithSheetJS() {
+// 🌟 ฟังก์ชันส่งออก CSV อัพสเกล (ดึงข้อมูลทุกอย่างในระบบ ทุกรอบบิล พร้อมรายละเอียดการผ่อนชำระ)
+function exportToCSV() {
   if (entries.length === 0) { alert("ไม่มีข้อมูล"); return; } 
-  const k = document.getElementById("cycleSelect").value; let flatList = [];
-  entries.forEach(x => { let m = x.method || "CreditCard";
+  let flatList = [];
+  
+  entries.forEach(x => { 
+    let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      // คำนวณดอกเบี้ย
+      let principal = Number(x.amount) || 0;
+      let totalToPay = Number(x.installmentPlan.totalToPay) || 0;
+      let totalInterest = totalToPay - principal;
+      if (totalInterest < 0) totalInterest = 0;
+      
+      // ข้อความรายละเอียดผ่อนชำระที่จะนำไปต่อท้าย
+      let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${x.installmentPlan.annualInterest}%, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
+
       x.installmentPlan.schedules.forEach(s => { 
-        if (keyFromDateForMethod(s.dueDate, m) === k) {
-          let instText = " [ผ่อนชำระ]";
-          if (x.installmentPlan.annualInterest > 0) {
-            let totalInterest = (x.amount * (x.installmentPlan.annualInterest / 100) * (x.installmentPlan.months / 12));
-            let interestPerMonth = totalInterest / x.installmentPlan.months;
-            instText += ` ดอกเบี้ย ${money(x.installmentPlan.annualInterest)}% ต่อปี (ดอกเบี้ยต่องวด: ฿${money(interestPerMonth)})`;
-          }
-          flatList.push({ sortDate: s.dueDate, date: fmtDate(s.dueDate), item: `${x.item}${instText}`, owner: x.owner, method: x.method, category: x.category, amount: Number(s.amount), repaid: s.paid ? Number(s.amount) : 0, remain: s.paid ? 0 : Number(s.amount), note: x.note || "" }); 
-        }
+        let cycleKey = keyFromDateForMethod(s.dueDate, m);
+        flatList.push({ 
+          cycle: cycleKey,
+          sortDate: s.dueDate, 
+          date: fmtDate(s.dueDate), 
+          item: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})${instText}`, 
+          owner: x.owner, 
+          method: x.method, 
+          category: x.category, 
+          amount: Number(s.amount), 
+          repaid: s.paid ? Number(s.amount) : 0, 
+          remain: s.paid ? 0 : Number(s.amount),
+          orderNo: x.orderNo || "-",
+          txNo: x.transactionNo || "-",
+          note: x.note || "" 
+        }); 
       });
     } else {
-      if (keyFromDateForMethod(x.date, m) === k) { const eff = getEffectiveItemData(x, k); flatList.push({ sortDate: x.date, date: fmtDate(x.date), item: x.item, owner: x.owner, method: x.method, category: x.category, amount: Number(eff.amount), repaid: Number(eff.repaid), remain: Number(eff.remain), note: x.note || "" }); }
+      let cycleKey = keyFromDateForMethod(x.date, m);
+      let r = getRepaidSum(x);
+      let rm = x.amount - r;
+      flatList.push({ 
+        cycle: cycleKey,
+        sortDate: x.date, 
+        date: fmtDate(x.date), 
+        item: x.item, 
+        owner: x.owner, 
+        method: x.method, 
+        category: x.category, 
+        amount: Number(x.amount), 
+        repaid: Number(r), 
+        remain: Number(rm > 0 ? rm : 0),
+        orderNo: x.orderNo || "-",
+        txNo: x.transactionNo || "-",
+        note: x.note || "" 
+      }); 
     }
   });
+
+  // เรียงลำดับวันที่จากอดีตไปอนาคต
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
-  let wsData = [ ["📊 รายงานสรุปค่าใช้จ่าย"], [], ["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอด (บาท)", "จ่ายคืน (บาท)", "ค้าง (บาท)", "หมายเหตุ"] ];
-  flatList.forEach(r => wsData.push([ r.date, r.item, r.owner, r.method, r.category, r.amount, r.repaid, r.remain, r.note ]));
-  let wb = XLSX.utils.book_new(); let ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!autofilter'] = { ref: 'A3:I3' };
-  XLSX.utils.book_append_sheet(wb, ws, "Report"); XLSX.writeFile(wb, `Report-${k}.xlsx`);
+
+  // สร้างข้อมูล CSV (ใส่ BOM เพื่อให้ Excel อ่านภาษาไทยได้สมบูรณ์)
+  let csvContent = "\uFEFF";
+  csvContent += "รอบบิล,วันที่,รายการ,ผู้จ่าย,ช่องทาง,หมวดหมู่,ยอดต่องวด (บาท),จ่ายคืนแล้ว (บาท),ค้างชำระ (บาท),Order No.,Transaction No.,หมายเหตุ\n";
+
+  flatList.forEach(r => { 
+    // ป้องกันปัญหาการตัดคอลัมน์ผิดพลาดหากมีเครื่องหมาย , ภายในข้อความ
+    let itemSafe = `"${(r.item || "").replace(/"/g, '""')}"`;
+    let ownerSafe = `"${(r.owner || "").replace(/"/g, '""')}"`;
+    let methodSafe = `"${(r.method || "").replace(/"/g, '""')}"`;
+    let catSafe = `"${(r.category || "").replace(/"/g, '""')}"`;
+    let noteSafe = `"${(r.note || "").replace(/"/g, '""')}"`;
+    let orderSafe = `"${(r.orderNo || "").replace(/"/g, '""')}"`;
+    let txSafe = `"${(r.txNo || "").replace(/"/g, '""')}"`;
+
+    let row = [
+      r.cycle,
+      r.date,
+      itemSafe,
+      ownerSafe,
+      methodSafe,
+      catSafe,
+      r.amount.toFixed(2),
+      r.repaid.toFixed(2),
+      r.remain.toFixed(2),
+      orderSafe,
+      txSafe,
+      noteSafe
+    ];
+    csvContent += row.join(",") + "\n";
+  });
+
+  // สร้างไฟล์สำหรับดาวน์โหลด
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  
+  // ตั้งชื่อไฟล์ตามวันที่และเวลาดาวน์โหลด
+  const now = new Date();
+  const timestamp = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  link.setAttribute("download", `All_Expenses_Export_${timestamp}.csv`);
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function openSettings(){ 
