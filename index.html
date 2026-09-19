@@ -249,7 +249,35 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ดอกเบี้ยรวม: <strong id="instInterestVal" style="color:var(--danger)">฿0.00</strong></span><span>อัตราดอกเบี้ย: <strong id="instPercentVal">0% ต่อปี</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto; padding-right:4px;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
 
-<div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">บันทึกการชำระคืน</h3><div style="background:var(--bg); border-radius:20px; padding:20px; text-align:center; margin-bottom:24px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);"><div style="font-size:13.5px; color:var(--text-muted); margin-bottom:6px" id="repayItemName"></div><div style="font-size:11.5px; color:var(--text-muted);">ยอดคงค้าง</div><div id="repayRemainAmt" style="font-size:30px; font-weight:700; color:var(--danger)">฿0.00</div></div><div class="input-group"><label>วันที่โอน</label><input id="repayDate" type="date"></div><div class="input-group"><label>ยอดเงินที่โอน</label><input id="repayInputAmt" type="number" min="0" step="0.01"></div><div class="input-group"><label>📷 แนบสลิป</label><input id="repayImg" type="file" accept="image/*"></div><div style="display:flex; gap:12px; margin-top:10px"><button class="btn-main" style="flex:1; background:var(--bg); color:var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="fillFullRepay()">เติมยอดเต็ม</button><button class="btn-main" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button></div><input type="hidden" id="repayEntryId"></div></div>
+<!-- Modal บันทึกการชำระคืน (พร้อมเลือกคนชำระคืนเมื่อกดจากหน้ารวม) -->
+<div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()">
+  <div class="sheet">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 20px; font-size:20px; text-align:center">บันทึกการชำระคืน</h3>
+    <div style="background:var(--bg); border-radius:20px; padding:20px; text-align:center; margin-bottom:20px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);">
+      <div style="font-size:13.5px; color:var(--text-muted); margin-bottom:6px" id="repayItemName"></div>
+      <div style="font-size:11.5px; color:var(--text-muted);">ยอดคงค้าง</div>
+      <div id="repayRemainAmt" style="font-size:30px; font-weight:700; color:var(--danger)">฿0.00</div>
+    </div>
+    
+    <div class="input-group" id="repayPayerSelectGroup">
+      <label>ใครเป็นคนชำระคืน?</label>
+      <select id="repayPayerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;">
+        <option value="Nu">Nu</option>
+        <option value="B">B</option>
+      </select>
+    </div>
+
+    <div class="input-group"><label>วันที่โอน</label><input id="repayDate" type="date"></div>
+    <div class="input-group"><label>ยอดเงินที่โอน</label><input id="repayInputAmt" type="number" min="0" step="0.01"></div>
+    <div class="input-group"><label>📷 แนบสลิป</label><input id="repayImg" type="file" accept="image/*"></div>
+    <div style="display:flex; gap:12px; margin-top:10px">
+      <button class="btn-main" style="flex:1; background:var(--bg); color:var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="fillFullRepay()">เติมยอดเต็ม</button>
+      <button class="btn-main" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button>
+    </div>
+    <input type="hidden" id="repayEntryId">
+  </div>
+</div>
 
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิลและงบช่องทาง</h3><div style="max-height: 55vh; overflow-y: auto; padding-right:4px;" id="channelSettingsList"></div><button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่า</button></div></div>
 
@@ -501,20 +529,67 @@ function getEffectiveItemData(e, selectedCycleKey) {
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
 }
 
-function openRepayModal(id){ const e = entries.find(x => x.id === id); if(!e) return; curRepayId = id; const currentCycleKey = document.getElementById("cycleSelect").value; const eff = getEffectiveItemData(e, currentCycleKey); document.getElementById("repayItemName").textContent = e.item; document.getElementById("repayRemainAmt").textContent = "฿" + money(eff.remain); document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`; document.getElementById("repayInputAmt").value = ""; document.getElementById("repayImg").value = ""; document.getElementById("repayModal").classList.add("open"); }
+// 🌟 ฟังก์ชันเปิดหน้าต่างบันทึกชำระคืน (รองรับทั้งแบบระบุตัวคน และแบบไม่ระบุคนเพื่อเลือกใน Modal)
+function openRepayModal(id, forcedPayer = null){ 
+  const e = entries.find(x => x.id === id); if(!e) return; 
+  curRepayId = id; 
+  const currentCycleKey = document.getElementById("cycleSelect").value; 
+  const eff = getEffectiveItemData(e, currentCycleKey); 
+  document.getElementById("repayItemName").textContent = e.item; 
+  document.getElementById("repayRemainAmt").textContent = "฿" + money(eff.remain); 
+  document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`; 
+  document.getElementById("repayInputAmt").value = ""; 
+  document.getElementById("repayImg").value = ""; 
+
+  const payerGroup = document.getElementById("repayPayerSelectGroup");
+  const payerSelect = document.getElementById("repayPayerSelect");
+
+  if (forcedPayer) {
+    // กรณีคลิกชำระจากหน้าของบุคคลนั้นๆ ล็อกคนจ่ายตามบุคคลนั้นทันที (ซ่อน Dropdown หรือเลือกให้อัตโนมัติ)
+    payerSelect.value = forcedPayer;
+    payerGroup.style.display = "none";
+  } else {
+    // กรณีคลิกชำระจากหน้ารวม ให้แสดง Dropdown เลือกคนจ่าย
+    payerGroup.style.display = "block";
+    payerSelect.innerHTML = `<option value="Nu">Nu</option><option value="B">B</option>`;
+  }
+
+  document.getElementById("repayModal").classList.add("open"); 
+}
+
 function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; }
 function fillFullRepay(){ const e = entries.find(x => x.id === curRepayId); const eff = getEffectiveItemData(e, document.getElementById("cycleSelect").value); document.getElementById("repayInputAmt").value = eff.remain > 0 ? eff.remain : 0; }
+
 async function confirmRepay(){
   const btn = document.getElementById("btnConfirmRepay"); if(!curRepayId) return;
   try {
-    const date = document.getElementById("repayDate").value; const amt = Number(document.getElementById("repayInputAmt").value);
-    const e = entries.find(x => x.id === curRepayId); if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
+    const date = document.getElementById("repayDate").value; 
+    const amt = Number(document.getElementById("repayInputAmt").value);
+    const payer = document.getElementById("repayPayerSelect").value; // ผู้ชำระคืน
+    const e = entries.find(x => x.id === curRepayId); 
+
+    if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; }
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
-    const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file);
-    if (e.isInstallment && e.installmentPlan) { let currentCycleKey = document.getElementById("cycleSelect").value; let m = e.method || "CreditCard"; let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid); if (targetSchedule) { targetSchedule.paid = true; await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan }); } }
-    const newRepay = { id: Date.now().toString(), date, amount: amt, image: b64Img }; await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); closeRepayModal();
+    
+    const file = document.getElementById("repayImg").files[0]; 
+    const b64Img = await compressImage(file);
+
+    if (e.isInstallment && e.installmentPlan) { 
+      let currentCycleKey = document.getElementById("cycleSelect").value; 
+      let m = e.method || "CreditCard"; 
+      let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid); 
+      if (targetSchedule) { 
+        targetSchedule.paid = true; 
+        await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan }); 
+      } 
+    }
+
+    const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; 
+    await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); 
+    closeRepayModal();
   } catch (err) { alert("เกิดข้อผิดพลาด"); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; }
 }
+
 function deleteRepay(eid, rid){ if(confirm("ลบประวัติการชำระคืน?")){ const e = entries.find(x => x.id === eid); const updatedRepayments = e.repayments.filter(r => r.id !== rid); db.collection("entries").doc(eid).update({ repayments: updatedRepayments }); } }
 
 let currentInstEntryId = null;
@@ -630,7 +705,7 @@ function toggleChannelAccordion(id) {
 
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// 🌟 ฟังก์ชันเปิดดูรายละเอียดบุคคล (เพิ่มปุ่ม/ลิงก์ชำระยอดค้างได้)
+// 🌟 ฟังก์ชันเปิดดูรายละเอียดบุคคล (กดชำระยอดค้าง และล็อกคนจ่ายตามชื่อบุคคลนั้นๆ ทันที)
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
@@ -666,7 +741,7 @@ function openPersonDetail(personName) {
         let imgTag = item.image ? `<img src="${item.image}" style="width:32px; height:32px; border-radius:8px; object-fit:cover; cursor:pointer;" onclick="viewImage('${item.image}')">` : '<div style="width:32px; height:32px; border-radius:8px; background:var(--surface-white); display:flex; align-items:center; justify-content:center; font-size:14px;">🏷️</div>'; 
         
         let remainHtml = item.itemRemain > 0 
-          ? `<div style="font-size:11px; color:var(--danger); font-weight:600; cursor:pointer; text-decoration:underline;" onclick="closePersonModal(); openRepayModal('${item.id}')">ค้าง ฿${money(item.itemRemain)} (ชำระ)</div>` 
+          ? `<div style="font-size:11px; color:var(--danger); font-weight:600; cursor:pointer; text-decoration:underline;" onclick="closePersonModal(); openRepayModal('${item.id}', '${personName}')">ค้าง ฿${money(item.itemRemain)} (ชำระ)</div>` 
           : `<div style="font-size:11px; color:var(--primary); font-weight:600;">ครบแล้ว</div>`;
 
         html += `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; background:var(--surface-white); padding:8px 10px; border-radius:10px;">
@@ -704,7 +779,13 @@ function render(){
     const eff = getEffectiveItemData(x, k); tR += eff.remain;
     let ownerKey = x.owner; if(!pD[ownerKey]) pD[ownerKey] = { s: 0, p: 0, rm: 0 }; pD[ownerKey].s += eff.amount; pD[ownerKey].p += eff.repaid; pD[ownerKey].rm += eff.remain;
     if(x.owner === "Nu & B") { ['Nu', 'B'].forEach(pName => { if(!pD[pName]) pD[pName] = { s: 0, p: 0, rm: 0 }; pD[pName].s += eff.amount * 0.5; pD[pName].p += eff.repaid * 0.5; pD[pName].rm += eff.remain * 0.5; }); }
-    let hHtml = ""; if(x.repayments && x.repayments.length > 0) hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;"><span style="font-size:12px">${fmtDate(r.date)}</span><div><strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong><button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button></div></div>`).join("")}</div>`;
+    
+    // แสดงประวัติการชำระคืน (พร้อมระบุว่าใครเป็นคนชำระ)
+    let hHtml = ""; 
+    if(x.repayments && x.repayments.length > 0) {
+      hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;"><span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span><div><strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong><button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button></div></div>`).join("")}</div>`;
+    }
+
     const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
     let instBadge = ""; let m = x.method || "CreditCard";
     if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
