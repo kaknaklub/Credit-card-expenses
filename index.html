@@ -227,16 +227,9 @@ function autoCalculateInterest() {
     let totalInterest = totalToPay - principal;
     if (totalInterest < 0) totalInterest = 0;
 
-    if (intType === 'baht') {
-      document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
-      // คำนวณ % ต่อปีกลับไป
-      let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
-      document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
-    } else {
-      document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
-      let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
-      document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
-    }
+    document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+    let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+    document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
   }
 }
 
@@ -305,7 +298,13 @@ function importJSON() {
       document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : "";
       document.querySelector(`input[name="interestType"][value="percent"]`).checked = true;
       toggleInterestInput();
-      document.getElementById('addInterestPercent').value = (Number(data.annualInterest) || 0).toFixed(2);
+      
+      // ✅ แก้ไข: คำนวณ % อัตโนมัติทันทีหากใน JSON มีข้อมูลดอกเบี้ยบาทมาแต่ไม่มี % หรือ % เป็น 0
+      let finalAnnual = Number(data.annualInterest) || 0;
+      if (finalAnnual === 0 && calculatedInterestBaht > 0 && principal > 0 && data.addMonths > 0) {
+        finalAnnual = (calculatedInterestBaht / principal) * (12 / data.addMonths) * 100;
+      }
+      document.getElementById('addInterestPercent').value = finalAnnual.toFixed(2);
       onPercentInput();
       window._importedSchedules = data.schedules || null;
     } else {
@@ -338,8 +337,13 @@ async function addEntry(){
     if (isInst) {
       const months = Number(document.getElementById("addMonths").value) || 5; 
       const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; 
-      const annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
-      const totalInterest = Number(document.getElementById("addInterestBaht").value) || (amount * (annualInterest / 100) * (months / 12));
+      let annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
+      let totalInterest = Number(document.getElementById("addInterestBaht").value) || (amount * (annualInterest / 100) * (months / 12));
+      
+      // ✅ แก้ไข: หากมีดอกเบี้ยบาทแต่เปอร์เซ็นต์เป็น 0 ให้คำนวณ % กลับด้านให้ถูกต้องเสมอตอนบันทึก
+      if (annualInterest === 0 && totalInterest > 0 && amount > 0 && months > 0) {
+        annualInterest = (totalInterest / amount) * (12 / months) * 100;
+      }
       
       let totalToPay = amount + totalInterest; 
       let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); 
@@ -441,7 +445,13 @@ function openInstallmentModal(id) {
   let totalInterest = Number(plan.totalToPay) - principal;
   if(totalInterest < 0) totalInterest = 0;
   document.getElementById("instInterestVal").textContent = "฿" + money(totalInterest);
-  document.getElementById("instPercentVal").textContent = (plan.annualInterest || 0).toFixed(2) + "% ต่อปี";
+
+  // ✅ แก้ไข: หากในแผนไม่มี annualInterest แต่มี totalInterest และ principal ให้คำนวณย้อนกลับแสดงผลให้ถูกต้องทันที
+  let annualVal = Number(plan.annualInterest) || 0;
+  if (annualVal === 0 && totalInterest > 0 && principal > 0 && plan.months > 0) {
+    annualVal = (totalInterest / principal) * (12 / plan.months) * 100;
+  }
+  document.getElementById("instPercentVal").textContent = annualVal.toFixed(2) + "% ต่อปี";
 
   let paidCount = plan.schedules.filter(s => s.paid).length; 
   document.getElementById("instPaidVal").textContent = `${paidCount} งวด`; 
@@ -526,7 +536,7 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html + `</table>`;
 }
 
-// 🌟 ฟังก์ชันส่งออก CSV เฉพาะรอบบิลที่เลือก พร้อมรายละเอียดการผ่อนชำระและดอกเบี้ยสมบูรณ์
+// 🌟 ฟังก์ชันส่งออก CSV เฉพาะรอบบิลที่เลือก พร้อมคำนวณ % ดอกเบี้ยออกมาย้อนหลังให้ถูกต้องเสมอ
 function exportToCSV() {
   const k = document.getElementById("cycleSelect").value;
   if (!k) { alert("กรุณาเลือกรอบบิลก่อนครับ"); return; }
@@ -542,7 +552,11 @@ function exportToCSV() {
           let totalToPay = Number(x.installmentPlan.totalToPay) || 0;
           let totalInterest = totalToPay - principal;
           if (totalInterest < 0) totalInterest = 0;
+          
           let annualInterest = Number(x.installmentPlan.annualInterest) || 0;
+          if (annualInterest === 0 && totalInterest > 0 && principal > 0 && x.installmentPlan.months > 0) {
+            annualInterest = (totalInterest / principal) * (12 / x.installmentPlan.months) * 100;
+          }
           
           let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${annualInterest.toFixed(2)}% ต่อปี, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
 
