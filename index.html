@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.4</title>
+<title>Credit Card & Loan Master Pro V2.9.5</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -91,7 +91,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.4</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.5</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -161,7 +161,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div class="section-title">
       <h3>รายการประจำรอบบิล</h3>
       <div>
-        <span onclick="openPaymentHistoryModal()" style="background:var(--surface-white); padding:4px 10px; border-radius:8px; box-shadow:2px 2px 5px var(--shadow-dark);">📜 ประวัติการชำระ</span>
+        <span onclick="openPaymentHistoryModal()" style="background:var(--surface-white); padding:5px 12px; border-radius:10px; box-shadow:2px 2px 6px var(--shadow-dark); color:var(--primary-dark);">📜 ประวัติการชำระ</span>
         <span id="cycleLabelText">รอบปัจจุบัน</span>
       </div>
     </div>
@@ -273,7 +273,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div class="grabber"></div>
     <h3 style="margin:0 0 6px; font-size:20px; text-align:center">📜 ประวัติการชำระเงินรอบบิล</h3>
     <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="payHistCycleLabel"></div>
-    <div style="max-height: 50vh; overflow-y: auto; padding-right:4px;" id="payHistContainer"></div>
+    <div id="payHistSummaryBox"></div>
+    <div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="payHistContainer"></div>
     <button class="btn-main" style="margin-top:20px;" onclick="closePaymentHistoryModal()">ปิดหน้าต่าง</button>
   </div>
 </div>
@@ -456,12 +457,12 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.4")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.5")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
 
-// --- PAYMENT HISTORY MODAL LOGIC ---
+// --- PAYMENT HISTORY MODAL LOGIC (Enhanced V2.9.5) ---
 function openPaymentHistoryModal() {
   const k = document.getElementById("cycleSelect").value;
   if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
@@ -474,13 +475,19 @@ function openPaymentHistoryModal() {
   });
 
   let historyItems = [];
+  let totalHistAmt = 0;
+  let payerSummary = {};
+
   es.forEach(x => {
     let m = x.method || "CreditCard";
-    // Collect regular repayments
     if (x.repayments && x.repayments.length > 0) {
       x.repayments.forEach(r => {
         let rKey = keyFromDateForMethod(r.date, m);
         if (rKey === k) {
+          totalHistAmt += r.amount;
+          let p = r.payer || "ทั่วไป";
+          payerSummary[p] = (payerSummary[p] || 0) + r.amount;
+          
           historyItems.push({
             type: 'normal',
             entryId: x.id,
@@ -495,10 +502,13 @@ function openPaymentHistoryModal() {
         }
       });
     }
-    // Collect paid installment schedules
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => {
         if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
+          totalHistAmt += s.amount;
+          let p = s.payer || "ทั่วไป";
+          payerSummary[p] = (payerSummary[p] || 0) + s.amount;
+
           historyItems.push({
             type: 'installment',
             entryId: x.id,
@@ -517,20 +527,33 @@ function openPaymentHistoryModal() {
 
   historyItems.sort((a,b) => b.date.localeCompare(a.date));
 
+  // Render Summary Box Inside Modal
+  let summaryBoxHtml = "";
+  if (historyItems.length > 0) {
+    let chips = Object.keys(payerSummary).map(p => `<div style="background:rgba(255,255,255,0.2); padding:5px 10px; border-radius:10px; font-size:11.5px; backdrop-filter:blur(4px);">👤 ${esc(p)}: <strong>฿${money(payerSummary[p])}</strong></div>`).join("");
+    summaryBoxHtml = `
+      <div style="background:linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius:20px; padding:16px; color:#fff; margin-bottom:16px; box-shadow:0 6px 18px rgba(126,168,138,0.3);">
+        <div style="font-size:11.5px; opacity:0.9; text-transform:uppercase; letter-spacing:0.5px;">ยอดชำระสำเร็จรวมในรอบบิลนี้</div>
+        <div style="font-size:26px; font-weight:700; margin:4px 0 10px; letter-spacing:-0.5px;">฿${money(totalHistAmt)}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">${chips}</div>
+      </div>`;
+  }
+  document.getElementById("payHistSummaryBox").innerHTML = summaryBoxHtml;
+
   let html = "";
   if (historyItems.length === 0) {
     html = `<div style="text-align:center; padding:30px; color:var(--text-muted);">ยังไม่มีประวัติการชำระเงินในรอบบิลนี้ 📭</div>`;
   } else {
     historyItems.forEach(h => {
-      let slipBtn = h.image ? `<span style="cursor:pointer; font-size:18px;" onclick="viewImage('${h.image}')" title="ดูสลิป">📷</span>` : '<span style="opacity:0.3; font-size:14px;">ไม่มีสลิป</span>';
+      let slipThumbnail = h.image ? `<img src="${h.image}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="viewImage('${h.image}')">` : '<span style="opacity:0.3; font-size:12px;">📷</span>';
       let cancelAction = h.type === 'installment' 
         ? `cancelPaymentItem('${h.entryId}', 'installment', ${h.scheduleNo})` 
         : `cancelPaymentItem('${h.entryId}', 'normal', '${h.itemId}')`;
 
       html += `
-        <div style="background:var(--surface-white); border-radius:14px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+        <div style="background:var(--surface-white); border-radius:16px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
           <div style="display:flex; align-items:center; gap:12px; overflow:hidden;">
-            <div style="width:36px; height:36px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0;">${slipBtn}</div>
+            <div style="width:42px; height:42px; border-radius:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; box-shadow:inset 2px 2px 5px var(--shadow-dark);">${slipThumbnail}</div>
             <div style="overflow:hidden;">
               <div style="font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(h.itemName)}</div>
               <div style="font-size:11px; color:var(--text-muted);">${fmtDate(h.date)} • ${esc(h.method)} ${h.payer ? '• ('+h.payer+')' : ''}</div>
@@ -539,9 +562,9 @@ function openPaymentHistoryModal() {
           <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:10px;">
             <div>
               <div style="font-size:14px; font-weight:700; color:var(--primary-dark);">฿${money(h.amount)}</div>
-              <div style="font-size:9.5px; color:var(--primary);">ชำระแล้ว ✓</div>
+              <div style="font-size:9.5px; color:var(--primary); font-weight:600;">จ่ายแล้ว ✓</div>
             </div>
-            <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:6px 10px; cursor:pointer;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
+            <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:6px 10px; cursor:pointer; font-weight:600;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
           </div>
         </div>`;
     });
@@ -785,7 +808,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.4`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.5`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1015,7 +1038,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.4", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.5", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1643,7 +1666,7 @@ function render(){
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
                 </div>
-              `;
+              </div>`;
     }).join("");
   } else {
     entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
