@@ -349,7 +349,6 @@ function onBahtInput() {
   }
 }
 
-// 🌟 ฟังก์ชันจัดการคำนวณสัดส่วน Custom Split อัตโนมัติ (Percent / Amount)
 function toggleSplitMode() {
   const mode = document.querySelector('input[name="splitMode"]:checked').value;
   const totalAmt = Number(document.getElementById('amount').value) || 0;
@@ -397,7 +396,7 @@ function onSplitInput(changed) {
     if (changed === 'Nu') {
       bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     } else {
-      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2);
+      nuInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     }
   }
 }
@@ -475,7 +474,6 @@ async function addEntry(){
 
     if(!date || !item || !Number.isFinite(amount) || amount <= 0){ alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
     
-    // จัดเก็บข้อมูล Split ถ้าเป็น Nu & B
     let splitDetails = null;
     if (owner === "Nu & B") {
       const mode = document.querySelector('input[name="splitMode"]:checked').value;
@@ -529,7 +527,6 @@ function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
 
-// รูปแบบวันที่ ค.ศ. (DD/MM/YYYY)
 function fmtDate(s){ 
   if(!s) return "-";
   let d = parseDate(s); 
@@ -600,7 +597,7 @@ async function confirmChangeOwner() {
 
 function openConvertInstModal(id) { const e = entries.find(x => x.id === id); if(!e) return; document.getElementById("convertEntryId").value = id; document.getElementById("convertInstItemName").textContent = `${e.item} (฿${money(e.amount)})`; const now = new Date(); document.getElementById("ciStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("convertInstModal").classList.add("open"); }
 function closeConvertInstModal() { document.getElementById("convertInstModal").classList.remove("open"); }
-async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จ!"); }
+async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จติดตั้งเรียบร้อย!"); }
 
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
@@ -613,6 +610,28 @@ function getEffectiveItemData(e, selectedCycleKey) {
     let effectiveRemain = effectiveAmount - paidSchedulesSum;
     return { amount: effectiveAmount, repaid: paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
   } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
+}
+
+// 🌟 ฟังก์ชันคำนวณส่วนแบ่งของแต่ละคนตามสัดส่วน (รองรับทั้ง Percent และ Amount ได้อย่างถูกต้องแม่นยำ)
+function getPersonShareForEntry(x, effAmount, personName) {
+  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+  if (!owners.includes(personName)) return 0;
+  if (owners.length === 1) return effAmount;
+
+  if (x.splitDetails) {
+    let mode = x.splitDetails.mode;
+    if (mode === 'percent') {
+      let p = Number(x.splitDetails[personName]) || 50;
+      return effAmount * (p / 100);
+    } else {
+      let exactAmt = Number(x.splitDetails[personName]) || (x.amount / 2);
+      let totalOriginal = x.amount > 0 ? x.amount : 1;
+      let ratio = exactAmt / totalOriginal;
+      return effAmount * ratio;
+    }
+  } else {
+    return effAmount * 0.5;
+  }
 }
 
 function openRepayModal(id, forcedPayer = null){ 
@@ -788,7 +807,6 @@ function toggleChannelAccordion(id) {
 
 function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
 
-// 🌟 ฟังก์ชันคำนวณและแสดงรายละเอียดบุคคลตามสัดส่วนจริง (แยกกระเป๋าใครกระเป๋ามมันอย่างแท้จริง)
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
@@ -808,25 +826,16 @@ function openPersonDetail(personName) {
     if (!eff.isInstActiveInCycle && x.isInstallment) return;
 
     let isSplit = (x.owner === "Nu & B" || x.owner === "Nu and B");
-    let shareMultiplier = 0.5;
-
-    if (isSplit && x.splitDetails) {
-      let mode = x.splitDetails.mode;
-      if (mode === 'percent') {
-        let p = Number(x.splitDetails[personName]) || 50;
-        shareMultiplier = p / 100;
-      } else {
-        let exactAmt = Number(x.splitDetails[personName]) || (eff.amount / 2);
-        shareMultiplier = eff.amount > 0 ? (exactAmt / eff.amount) : 0.5;
-      }
-    }
-
-    let itemSpent = eff.amount * shareMultiplier;
+    let itemSpent = getPersonShareForEntry(x, eff.amount, personName);
 
     let ownerPaid = (x.repayments || []).filter(r => r.payer === personName).reduce((sum, r) => sum + r.amount, 0);
     let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
     if (!isSplit && unassignedPaid > 0) ownerPaid += unassignedPaid;
-    if (isSplit && unassignedPaid > 0) ownerPaid += (unassignedPaid * shareMultiplier);
+    if (isSplit && unassignedPaid > 0) {
+      let pShare = getPersonShareForEntry(x, eff.amount, personName);
+      let ratio = eff.amount > 0 ? (pShare / eff.amount) : 0.5;
+      ownerPaid += (unassignedPaid * ratio);
+    }
 
     let itemRemain = Math.max(0, itemSpent - ownerPaid);
     let itemPaid = itemSpent - itemRemain;
@@ -901,23 +910,14 @@ function render(){
       owners.forEach(ownerName => {
         if (!pD[ownerName]) pD[ownerName] = { s: 0, p: 0, rm: 0 };
         
-        let shareAmt = eff.amount / owners.length;
-        if (owners.length === 2 && x.splitDetails) {
-          let mode = x.splitDetails.mode;
-          if (mode === 'percent') {
-            let p = Number(x.splitDetails[ownerName]) || 50;
-            shareAmt = eff.amount * (p / 100);
-          } else {
-            let exactAmt = Number(x.splitDetails[ownerName]) || (eff.amount / 2);
-            shareAmt = exactAmt;
-          }
-        }
+        let shareAmt = getPersonShareForEntry(x, eff.amount, ownerName);
         
         let ownerPaid = (x.repayments || []).filter(r => r.payer === ownerName).reduce((sum, r) => sum + r.amount, 0);
         let unassignedPaid = (x.repayments || []).filter(r => !r.payer).reduce((sum, r) => sum + r.amount, 0);
         
-        if (owners.length === 1 && unassignedPaid > 0) ownerPaid += unassignedPaid;
-        if (owners.length === 2 && unassignedPaid > 0) {
+        let isSplit = owners.length === 2;
+        if (!isSplit && unassignedPaid > 0) ownerPaid += unassignedPaid;
+        if (isSplit && unassignedPaid > 0) {
           let ratio = eff.amount > 0 ? (shareAmt / eff.amount) : 0.5;
           ownerPaid += (unassignedPaid * ratio);
         }
@@ -1048,7 +1048,7 @@ function filterVisualReport() {
     let matchCat = !catFilter || r.category === catFilter;
     let matchMethod = !methodFilter || r.method === methodFilter;
     return matchKw && matchCat && matchMethod;
-  }).sort((a,b)=>a.sortDate.localeCompare(b.sortDate));
+  }).sort((a,b)=>a.sortDate.locateCompare ? a.sortDate.localeCompare(b.sortDate) : a.sortDate.localeCompare(b.sortDate));
 
   let html = `<table class="report-table"><tr><th>วันที่</th><th>รายการ</th><th>ช่องทาง</th><th>หมวดหมู่</th><th>ยอด (฿)</th><th>ผู้จ่าย</th></tr>`;
   if (filtered.length === 0) {
