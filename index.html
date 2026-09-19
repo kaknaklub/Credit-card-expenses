@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.3</title>
+<title>Credit Card & Loan Master Pro V2.9.4</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -42,6 +42,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 
 .section-title { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
 .section-title h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.section-title div { display: flex; align-items: center; gap: 10px; }
 .section-title span { font-size: 12px; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
 .entry-card { background: var(--surface-white); border-radius: 18px; padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; gap: 12px; align-items: center; }
 .entry-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); overflow: hidden; }
@@ -90,7 +91,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.3</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.4</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -157,7 +158,13 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <div class="action-btn" onclick="openVisualReport()"><div class="icon">🖼️</div><span>พรีเมียม</span></div>
     </div>
 
-    <div class="section-title"><h3>รายการประจำรอบบิล</h3><span id="cycleLabelText">รอบปัจจุบัน</span></div>
+    <div class="section-title">
+      <h3>รายการประจำรอบบิล</h3>
+      <div>
+        <span onclick="openPaymentHistoryModal()" style="background:var(--surface-white); padding:4px 10px; border-radius:8px; box-shadow:2px 2px 5px var(--shadow-dark);">📜 ประวัติการชำระ</span>
+        <span id="cycleLabelText">รอบปัจจุบัน</span>
+      </div>
+    </div>
     <div id="entriesList"><div style="text-align:center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูล... ⏳</div></div>
   </div>
 
@@ -258,6 +265,17 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <div class="nav-fab" onclick="switchView('add')">+</div>
     <div class="nav-item" id="navProfile" onclick="switchView('profile')"><i>👤</i><span>Profile</span></div>
   </nav>
+</div>
+
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal) -->
+<div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
+  <div class="sheet" style="max-width: 600px;">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 6px; font-size:20px; text-align:center">📜 ประวัติการชำระเงินรอบบิล</h3>
+    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="payHistCycleLabel"></div>
+    <div style="max-height: 50vh; overflow-y: auto; padding-right:4px;" id="payHistContainer"></div>
+    <button class="btn-main" style="margin-top:20px;" onclick="closePaymentHistoryModal()">ปิดหน้าต่าง</button>
+  </div>
 </div>
 
 <!-- Modal ชำระหนี้หลายรายการพร้อมกัน (Bulk Repay) -->
@@ -438,10 +456,128 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.3")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.4")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
+
+// --- PAYMENT HISTORY MODAL LOGIC ---
+function openPaymentHistoryModal() {
+  const k = document.getElementById("cycleSelect").value;
+  if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
+  document.getElementById("payHistCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); 
+    return keyFromDateForMethod(x.date, m) === k; 
+  });
+
+  let historyItems = [];
+  es.forEach(x => {
+    let m = x.method || "CreditCard";
+    // Collect regular repayments
+    if (x.repayments && x.repayments.length > 0) {
+      x.repayments.forEach(r => {
+        let rKey = keyFromDateForMethod(r.date, m);
+        if (rKey === k) {
+          historyItems.push({
+            type: 'normal',
+            entryId: x.id,
+            itemId: r.id,
+            itemName: x.item,
+            method: x.method,
+            date: r.date,
+            amount: r.amount,
+            payer: r.payer,
+            image: r.image
+          });
+        }
+      });
+    }
+    // Collect paid installment schedules
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => {
+        if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
+          historyItems.push({
+            type: 'installment',
+            entryId: x.id,
+            scheduleNo: s.no,
+            itemName: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`,
+            method: x.method,
+            date: s.paidDate || s.dueDate,
+            amount: s.amount,
+            payer: s.payer,
+            image: s.image
+          });
+        }
+      });
+    }
+  });
+
+  historyItems.sort((a,b) => b.date.localeCompare(a.date));
+
+  let html = "";
+  if (historyItems.length === 0) {
+    html = `<div style="text-align:center; padding:30px; color:var(--text-muted);">ยังไม่มีประวัติการชำระเงินในรอบบิลนี้ 📭</div>`;
+  } else {
+    historyItems.forEach(h => {
+      let slipBtn = h.image ? `<span style="cursor:pointer; font-size:18px;" onclick="viewImage('${h.image}')" title="ดูสลิป">📷</span>` : '<span style="opacity:0.3; font-size:14px;">ไม่มีสลิป</span>';
+      let cancelAction = h.type === 'installment' 
+        ? `cancelPaymentItem('${h.entryId}', 'installment', ${h.scheduleNo})` 
+        : `cancelPaymentItem('${h.entryId}', 'normal', '${h.itemId}')`;
+
+      html += `
+        <div style="background:var(--surface-white); border-radius:14px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+          <div style="display:flex; align-items:center; gap:12px; overflow:hidden;">
+            <div style="width:36px; height:36px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0;">${slipBtn}</div>
+            <div style="overflow:hidden;">
+              <div style="font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(h.itemName)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${fmtDate(h.date)} • ${esc(h.method)} ${h.payer ? '• ('+h.payer+')' : ''}</div>
+            </div>
+          </div>
+          <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:10px;">
+            <div>
+              <div style="font-size:14px; font-weight:700; color:var(--primary-dark);">฿${money(h.amount)}</div>
+              <div style="font-size:9.5px; color:var(--primary);">ชำระแล้ว ✓</div>
+            </div>
+            <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:6px 10px; cursor:pointer;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
+          </div>
+        </div>`;
+    });
+  }
+
+  document.getElementById("payHistContainer").innerHTML = html;
+  document.getElementById("paymentHistoryModal").classList.add("open");
+}
+
+function closePaymentHistoryModal() {
+  document.getElementById("paymentHistoryModal").classList.remove("open");
+}
+
+async function cancelPaymentItem(entryId, type, idOrNo) {
+  if (!confirm("⚠️ คุณต้องการยกเลิกการชำระรายการนี้ใช่หรือไม่? ยอดเงินและภาระหนี้จะถูกคืนกลับมา")) return;
+  const e = entries.find(x => x.id === entryId);
+  if (!e) return;
+
+  if (type === 'installment') {
+    let plan = e.installmentPlan;
+    plan.schedules = plan.schedules.map(s => {
+      if (s.no === idOrNo) {
+        return { ...s, paid: false, image: null, paidDate: null, payer: null };
+      }
+      return s;
+    });
+    await db.collection("entries").doc(entryId).update({ installmentPlan: plan });
+  } else {
+    let updatedRepayments = (e.repayments || []).filter(r => r.id !== idOrNo);
+    await db.collection("entries").doc(entryId).update({ repayments: updatedRepayments });
+  }
+
+  openPaymentHistoryModal();
+  render();
+  alert("✅ ยกเลิกการชำระและซิงค์ข้อมูลเรียบร้อยแล้ว!");
+}
 
 // --- BULK REPAYMENT LOGIC ---
 function openBulkRepayModal() {
@@ -649,7 +785,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.3`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.4`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -879,7 +1015,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.3", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.4", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1214,21 +1350,6 @@ async function confirmRepay(){
   } catch (err) { alert("เกิดข้อผิดพลาด"); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; }
 }
 
-async function deleteRepay(eid, rid, isInstSchedule = false, scheduleNo = null){ 
-  if(confirm("ลบประวัติการชำระคืน?")){ 
-    const e = entries.find(x => x.id === eid); 
-    if(!e) return;
-    if(isInstSchedule && scheduleNo !== null && e.installmentPlan) {
-      let plan = e.installmentPlan;
-      plan.schedules = plan.schedules.map(s => s.no === scheduleNo ? { ...s, paid: false, image: null, paidDate: null, payer: null } : s);
-      await db.collection("entries").doc(eid).update({ installmentPlan: plan });
-    } else {
-      const updatedRepayments = e.repayments.filter(r => r.id !== rid); 
-      await db.collection("entries").doc(eid).update({ repayments: updatedRepayments }); 
-    }
-  } 
-}
-
 let currentInstEntryId = null;
 function openInstallmentModal(id) {
   const e = entries.find(x => x.id === id); if(!e || !e.installmentPlan) return; currentInstEntryId = id; const plan = e.installmentPlan;
@@ -1502,36 +1623,6 @@ function render(){
         pD[ownerName].rm += breakdown.remain;
       });
 
-      let hHtml = ""; 
-      let repList = [];
-      if(x.repayments && x.repayments.length > 0) {
-        repList = x.repayments.map(r => ({ type: 'normal', id: r.id, date: r.date, payer: r.payer, amount: r.amount, image: r.image }));
-      }
-      if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-        let m = x.method || "CreditCard";
-        x.installmentPlan.schedules.forEach(s => {
-          if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
-            repList.push({ type: 'installment', no: s.no, date: s.paidDate || s.dueDate, payer: s.payer, amount: s.amount, image: s.image });
-          }
-        });
-      }
-
-      if(repList.length > 0) {
-        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${repList.map(r => {
-          let slipBtn = r.image ? `<span style="cursor:pointer; margin-right:8px; font-size:14px;" onclick="viewImage('${r.image}')" title="ดูรูปสลิป">📷</span>` : "";
-          let titleText = r.type === 'installment' ? `งวดที่ ${r.no}${r.payer ? '('+r.payer+')' : ''}` : `${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}`;
-          let deleteAction = r.type === 'installment' ? `deleteRepay('${x.id}', null, true,${r.no})` : `deleteRepay('${x.id}', '${r.id}')`;
-          return `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;">
-            <span style="font-size:12px">${titleText}</span>
-            <div>
-              ${slipBtn}
-              <strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong>
-              <button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="${deleteAction}">✕</button>
-            </div>
-          </div>`;
-        }).join("")}</div>`;
-      }
-
       const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; 
       const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
       let instBadge = ""; let m = x.method || "CreditCard";
@@ -1546,14 +1637,13 @@ function render(){
                   <h4>${esc(x.item)}</h4>
                   <p>${fmtDate(x.date)} • ${changeOwnerBtn}</p>
                   <div class="entry-meta"><span class="badge">${esc(x.method)}</span> ${orderH} ${txH} ${instBadge}</div>
-                  ${hHtml}
                 </div>
                 <div class="entry-right">
                   <button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button>
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
                 </div>
-              </div>`;
+              `;
     }).join("");
   } else {
     entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`;
