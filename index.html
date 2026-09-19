@@ -242,7 +242,7 @@ let entries = [];
 let userChangedCycle = false;
 let localSettings = JSON.parse(localStorage.getItem("cc-master-settings")) || { budgets: {}, channels: { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } } };
 
-// 🌟 ฟังก์ชันนำเข้า JSON ที่อัปเกรดใหม่: คำนวณดอกเบี้ยและยอดผ่อนให้อัตโนมัติ
+// ฟังก์ชันนำเข้า JSON ที่อัปเกรดให้รองรับ startDate (วันเริ่มผ่อนงวดแรก)
 function importJSON() {
   try {
     const rawData = document.getElementById('jsonImportData').value.trim();
@@ -272,33 +272,35 @@ function importJSON() {
       toggleOwnerInput();
     }
 
-    // จัดการเรื่องผ่อนชำระและคำนวณดอกเบี้ยอัจฉริยะ
+    // จัดการเรื่องผ่อนชำระ ดอกเบี้ย และ วันเริ่มผ่อนงวดแรก
     if(data.txType === 'installment' && data.addMonths > 1) {
       document.querySelector(`input[name="txType"][value="installment"]`).checked = true;
       toggleTxType();
       
       document.getElementById('addMonths').value = data.addMonths;
 
+      // กำหนดวันเริ่มผ่อนงวดแรก (ถ้า Gemini ส่งมาให้) ถ้างั้นใช้วันที่ทำรายการแทน
+      if(data.startDate) {
+        document.getElementById('addStartDate').value = data.startDate;
+      } else if(data.date) {
+        document.getElementById('addStartDate').value = data.date;
+      }
+
       let calculatedInterestBaht = 0;
-      
-      // กรณีมีดอกเบี้ยเป็นบาทมาแล้ว หรือมี perMonth มาแต่ไม่มีดอกเบี้ย ให้คำนวณย้อนกลับ
       if (data.interestBaht !== undefined && data.interestBaht > 0) {
         calculatedInterestBaht = data.interestBaht;
       } else if (data.totalToPay !== undefined && data.amount !== undefined && data.totalToPay > data.amount) {
         calculatedInterestBaht = data.totalToPay - data.amount;
       } else if (data.perMonth !== undefined && data.amount !== undefined && data.addMonths > 0) {
         let totalSum = data.perMonth * data.addMonths;
-        if (totalSum > data.amount) {
-          calculatedInterestBaht = totalSum - data.amount;
-        }
+        if (totalSum > data.amount) calculatedInterestBaht = totalSum - data.amount;
       }
 
       if (calculatedInterestBaht > 0) {
-        // เลือกโหมดระบุยอดดอกเบี้ยเป็นบาท
         document.querySelector(`input[name="interestType"][value="baht"]`).checked = true;
         toggleInterestInput();
         document.getElementById('addInterestBaht').value = calculatedInterestBaht.toFixed(2);
-      } else if (data. annualInterest !== undefined && data.annualInterest > 0) {
+      } else if (data.annualInterest !== undefined && data.annualInterest > 0) {
         document.querySelector(`input[name="interestType"][value="percent"]`).checked = true;
         toggleInterestInput();
         document.getElementById('addInterestPercent').value = data.annualInterest;
@@ -309,7 +311,7 @@ function importJSON() {
     }
 
     toggleTxNo();
-    alert("✅ นำเข้าข้อมูลและคำนวณยอดผ่อน/ดอกเบี้ยสำเร็จ!");
+    alert("✅ นำเข้าข้อมูล วันเริ่มผ่อน และคำนวณดอกเบี้ยสำเร็จ!");
     document.getElementById('jsonImportData').value = "";
     document.getElementById('jsonImportBox').classList.add('hidden');
     
