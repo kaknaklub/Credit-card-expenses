@@ -641,19 +641,81 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html + `</table>`;
 }
 
+// ฟังก์ชันหลักที่แก้ไขใหม่
 function exportStyledExcelWithSheetJS() {
-  if (entries.length === 0) { alert("ไม่มีข้อมูล"); return; } const k = document.getElementById("cycleSelect").value; let flatList = [];
-  entries.forEach(x => { let m = x.method || "CreditCard";
+  if (entries.length === 0) { 
+    alert("ไม่มีข้อมูล"); 
+    return; 
+  } 
+  
+  const k = document.getElementById("cycleSelect").value; 
+  let flatList = [];
+  
+  entries.forEach(x => { 
+    let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      x.installmentPlan.schedules.forEach(s => { if (keyFromDateForMethod(s.dueDate, m) === k) flatList.push({ sortDate: s.dueDate, date: fmtDate(s.dueDate), item: `${x.item} [ผ่อนงวดที่ ${s.no}]`, owner: x.owner, method: x.method, category: x.category, amount: Number(s.amount), repaid: s.paid ? Number(s.amount) : 0, remain: s.paid ? 0 : Number(s.amount), note: x.note || "" }); });
+      x.installmentPlan.schedules.forEach(s => { 
+        if (keyFromDateForMethod(s.dueDate, m) === k) {
+          let instText = " [ผ่อนชำระ]";
+          if (x.installmentPlan.annualInterest > 0) {
+            let totalInterest = (x.amount * (x.installmentPlan.annualInterest / 100) * (x.installmentPlan.months / 12));
+            let interestPerMonth = totalInterest / x.installmentPlan.months;
+            instText += ` ดอกเบี้ย ${money(x.installmentPlan.annualInterest)}% ต่อปี (ดอกเบี้ยต่องวด: ฿${money(interestPerMonth)})`;
+          }
+          flatList.push({ 
+            sortDate: s.dueDate, 
+            date: fmtDate(s.dueDate), 
+            item: `${x.item}${instText}`, 
+            owner: x.owner, 
+            method: x.method, 
+            category: x.category, 
+            amount: Number(s.amount), 
+            repaid: s.paid ? Number(s.amount) : 0, 
+            remain: s.paid ? 0 : Number(s.amount), 
+            note: x.note || "" 
+          }); 
+        }
+      });
     } else {
-      if (keyFromDateForMethod(x.date, m) === k) { const eff = getEffectiveItemData(x, k); flatList.push({ sortDate: x.date, date: fmtDate(x.date), item: x.item, owner: x.owner, method: x.method, category: x.category, amount: Number(eff.amount), repaid: Number(eff.repaid), remain: Number(eff.remain), note: x.note || "" }); }
+      if (keyFromDateForMethod(x.date, m) === k) { 
+        const eff = getEffectiveItemData(x, k); 
+        flatList.push({ 
+          sortDate: x.date, 
+          date: fmtDate(x.date), 
+          item: x.item, 
+          owner: x.owner, 
+          method: x.method, 
+          category: x.category, 
+          amount: Number(eff.amount), 
+          repaid: Number(eff.repaid), 
+          remain: Number(eff.remain), 
+          note: x.note || "" 
+        }); 
+      }
     }
   });
+
+  // เรียงลำดับวันที่จากอดีต/ปัจจุบันไปอนาคต (น้อยไปมาก)
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
-  let wsData = [ ["📊 รายงานสรุปค่าใช้จ่าย"], [], ["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอด (บาท)", "จ่ายคืน (บาท)", "ค้าง (บาท)", "หมายเหตุ"] ];
-  flatList.forEach(r => wsData.push([ r.date, r.item, r.owner, r.method, r.category, r.amount, r.repaid, r.remain, r.note ]));
-  let wb = XLSX.utils.book_new(); let ws = XLSX.utils.aoa_to_sheet(wsData); XLSX.utils.book_append_sheet(wb, ws, "Report"); XLSX.writeFile(wb, `Report-${k}.xlsx`);
+
+  let wsData = [ 
+    ["📊 รายงานสรุปค่าใช้จ่าย"], 
+    [], 
+    ["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอด (บาท)", "จ่ายคืน (บาท)", "ค้าง (บาท)", "หมายเหตุ"] 
+  ];
+  
+  flatList.forEach(r => wsData.push([ 
+    r.date, r.item, r.owner, r.method, r.category, r.amount, r.repaid, r.remain, r.note 
+  ]));
+
+  let wb = XLSX.utils.book_new(); 
+  let ws = XLSX.utils.aoa_to_sheet(wsData);
+  
+  // เปิดใช้งานตัวกรองข้อมูล (AutoFilter) ที่แถวหัวตาราง (แถวที่ 3)
+  ws['!autofilter'] = { ref: 'A3:I3' };
+  
+  XLSX.utils.book_append_sheet(wb, ws, "Report"); 
+  XLSX.writeFile(wb, `Report-${k}.xlsx`);
 }
 
 function openSettings(){ 
