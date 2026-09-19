@@ -7,6 +7,8 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+<!-- SheetJS (xlsx) สำหรับ Export Excel สไตล์พรีเมียม -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
@@ -229,9 +231,9 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
         <div class="icon">🎯</div>
         <span>ตั้งงบ</span>
       </div>
-      <div class="action-btn" onclick="exportStyledCSV()">
+      <div class="action-btn" onclick="exportStyledExcelWithSheetJS()">
         <div class="icon">📊</div>
-        <span>ชีท CSV</span>
+        <span>ชีท Excel</span>
       </div>
       <div class="action-btn" onclick="openVisualReport()">
         <div class="icon">🖼️</div>
@@ -1238,88 +1240,85 @@ function filterVisualReport() {
   document.getElementById('reportContent').innerHTML = html;
 }
 
-// --- ส่งออกไฟล์ CSV พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน (เดือน 9 ขึ้นก่อนเดือน 10) ---
-function exportStyledCSV() {
-  if(entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
+// --- ส่งออกไฟล์ Excel สไตล์พรีเมียมด้วย SheetJS (พร้อมจัดเรียงวันที่จากอดีตไปปัจจุบัน และแยกวันที่งวดผ่อน) ---
+function exportStyledExcelWithSheetJS() {
+  if (entries.length === 0) { alert("ไม่มีข้อมูลสำหรับการส่งออก"); return; }
   const k = document.getElementById("cycleSelect").value;
-  
-  // รวบรวมรายการทั้งหมดที่จะออกรายงานในรอบบิลนี้ (ทั้งปกติและตารางผ่อน)
-  let flatList = [];
 
+  let flatList = [];
   entries.forEach(x => {
     let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => {
         if (keyFromDateForMethod(s.dueDate, m) === k) {
           flatList.push({
-            date: s.dueDate, // ใช้วันที่กำหนดจ่ายงวดจริง
-            rawItem: x,
-            isInst: true,
-            schedule: s,
-            sortDate: s.dueDate
+            sortDate: s.dueDate,
+            date: fmtDate(s.dueDate),
+            item: `${x.item} [ผ่อนชำระ งวดที่ ${s.no}/${x.installmentPlan.months} | ดอกเบี้ย ${x.installmentPlan.annualInterest || 0}% ต่อปี]`,
+            owner: x.owner,
+            method: x.method,
+            category: x.category,
+            amount: Number(s.amount),
+            repaid: s.paid ? Number(s.amount) : 0,
+            remain: s.paid ? 0 : Number(s.amount),
+            note: x.note || ""
           });
         }
       });
     } else {
       if (keyFromDateForMethod(x.date, m) === k) {
+        const eff = getEffectiveItemData(x, k);
         flatList.push({
-          date: x.date,
-          rawItem: x,
-          isInst: false,
-          sortDate: x.date
+          sortDate: x.date,
+          date: fmtDate(x.date),
+          item: x.item,
+          owner: x.owner,
+          method: x.method,
+          category: x.category,
+          amount: Number(eff.amount),
+          repaid: Number(eff.repaid),
+          remain: Number(eff.remain),
+          note: x.note || ""
         });
       }
     }
   });
 
-  // เรียงลำดับวันที่จากอดีตไปปัจจุบัน (Ascending: เก่าไปใหม่ -> เดือน 9 ก่อนเดือน 10)
+  // เรียงลำดับวันที่จากอดีตไปปัจจุบัน (เดือน 9 ขึ้นก่อนเดือน 10)
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
-  let csvRows = [];
-  // Header
-  csvRows.push(["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"].map(field => `"${field}"`).join(","));
+  // สร้างโครงสร้างข้อมูลสำหรับ SheetJS
+  let wsData = [
+    ["📊 รายงานสรุปค่าใช้จ่ายประจำรอบบิล"],
+    [`รอบบิล: ${cycleLabel(k)} | สร้างจากระบบ Credit Card & Loan Master Pro`],
+    [], // แถวเว้นว่าง
+    ["วันที่", "รายการ", "ผู้จ่าย", "ช่องทาง", "หมวดหมู่", "ยอดในรอบบิล (บาท)", "จ่ายคืนแล้ว (บาท)", "ยอดค้าง (บาท)", "หมายเหตุ"]
+  ];
 
-  flatList.forEach(item => {
-    let x = item.rawItem;
-    let rowDate = "";
-    let itemName = x.item;
-    let amount = 0;
-    let repaid = 0;
-    let remain = 0;
-
-    if (item.isInst) {
-      let s = item.schedule;
-      rowDate = fmtDate(s.dueDate);
-      itemName += ` [ผ่อนชำระ งวดที่ ${s.no}/${x.installmentPlan.months} | ดอกเบี้ย ${x.installmentPlan.annualInterest || 0}% ต่อปี]`;
-      amount = s.amount;
-      repaid = s.paid ? s.amount : 0;
-      remain = s.paid ? 0 : s.amount;
-    } else {
-      const eff = getEffectiveItemData(x, k);
-      rowDate = fmtDate(x.date);
-      amount = eff.amount;
-      repaid = eff.repaid;
-      remain = eff.remain;
-    }
-
-    let row = [
-      rowDate,
-      itemName,
-      x.owner,
-      x.method,
-      x.category,
-      Number(amount).toFixed(2),
-      Number(repaid).toFixed(2),
-      Number(remain).toFixed(2),
-      x.note || ""
-    ];
-
-    csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(","));
+  flatList.forEach(row => {
+    wsData.push([
+      row.date,
+      row.item,
+      row.owner,
+      row.method,
+      row.category,
+      row.amount,
+      row.repaid,
+      row.remain,
+      row.note
+    ]);
   });
 
-  const csvString = csvRows.join("\r\n");
-  const blob = new Blob(["\ufeff" + csvString], { type: "text/csv;charset=utf-8;" });
-  downloadBlob(blob, `Expense-Report-${k}.csv`);
+  let wb = XLSX.utils.book_new();
+  let ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // ตกแต่งความกว้างคอลัมน์อัตโนมัติ
+  ws['!cols'] = [
+    {wch: 14}, {wch: 40}, {wch: 12}, {wch: 15}, {wch: 22}, {wch: 18}, {wch: 18}, {wch: 16}, {wch: 20}
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Expense-Report");
+  XLSX.writeFile(wb, `Expense-Report-${k}.xlsx`);
 }
 
 // --- Setting Modal (Per-Channel Cutoff & Due Dates) ---
