@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro</title>
+<title>Credit Card & Loan Master Pro - Ultimate Edition</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
 <!-- SheetJS (xlsx) สำหรับ Export Excel สไตล์พรีเมียม -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Tesseract.js สำหรับ OCR สแกนใบเสร็จ (ฟรีและโอเพนซอร์ส) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
@@ -140,6 +142,10 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
 }
 .btn-main:active { transform: translateY(2px); box-shadow: 2px 2px 6px rgba(126, 168, 138, 0.4); }
 
+/* AI Scan Banner */
+.ai-banner { background: #e8f4ef; border: 1.5px dashed var(--primary); border-radius: 16px; padding: 14px; margin-bottom: 20px; text-align: center; font-size: 13px; color: var(--primary-dark); cursor: pointer; transition: 0.2s; }
+.ai-banner:active { background: #d8ece4; }
+
 /* Bottom Nav */
 .bottom-nav {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -259,6 +265,12 @@ input[type="file"] { padding: 10px; font-size: 12px; color: var(--text-muted); }
         <p>New Transaction</p>
         <h1>เพิ่มรายการใหม่</h1>
       </div>
+    </div>
+
+    <!-- AI Scan Receipt Banner (Free 100%) -->
+    <div class="ai-banner" onclick="document.getElementById('aiReceiptInput').click()">
+      ✨ <strong>สแกนใบเสร็จด้วย AI (ฟรี!)</strong><br><span style="font-size:11.5px; opacity:0.8;">แตะเพื่ออัปโหลดรูปใบเสร็จ ให้ AI ดึงข้อมูลให้อัตโนมัติ</span>
+      <input type="file" id="aiReceiptInput" accept="image/*" class="hidden" onchange="scanReceiptWithAI(this)">
     </div>
 
     <div class="input-group"><label>วันที่</label><input id="date" type="date"></div>
@@ -573,6 +585,60 @@ function compressImage(file) {
 
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
+
+// --- AI Receipt Scanner (Free 100% using Tesseract.js) ---
+async function scanReceiptWithAI(input) {
+  const file = input.files[0];
+  if(!file) return;
+  
+  const originalBtnText = document.querySelector('.ai-banner').innerHTML;
+  document.querySelector('.ai-banner').innerHTML = `⏳ <strong>AI กำลังอ่านใบเสร็จ...</strong><br><span style="font-size:11.5px;">โปรดรอสักครู่ ระบบกำลังประมวลผลข้อความ</span>`;
+  
+  try {
+    const compressedB64 = await compressImage(file);
+    document.getElementById('entryImg').files = input.files; // แนบรูปเข้าฟอร์มหลักด้วย
+    
+    // ใช้ Tesseract อ่านข้อความภาษาไทยและอังกฤษแบบออฟไลน์/ฟรี
+    const result = await Tesseract.recognize(file, 'tha+eng', {
+      logger: m => console.log(m)
+    });
+    
+    const text = result.data.text;
+    console.log("OCR Extracted Text:", text);
+    
+    // ค้นหายอดเงินด้วย Regular Expression (เช่น 1,234.50 หรือ 500.00)
+    const moneyRegex = /\b\d{1,3}(?:,\d{3})*\.\d{2}\b/g;
+    const matches = text.match(moneyRegex);
+    if(matches && matches.length > 0) {
+      // เอาตัวเลขที่มากที่สุดในใบเสร็จมาเป็นยอดเงินรวม
+      const cleanNumbers = matches.map(m => Number(m.replace(/,/g, '')));
+      const maxAmount = Math.max(...cleanNumbers);
+      document.getElementById('amount').value = maxAmount;
+    }
+    
+    // ค้นหาวันที่รูปแบบ YYYY-MM-DD หรือ DD/MM/YYYY
+    const dateRegex = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/;
+    const dateMatch = text.match(dateRegex);
+    if(dateMatch) {
+      let d = pad(dateMatch[1]);
+      let m = pad(dateMatch[2]);
+      let y = dateMatch[3];
+      if(y.length === 2) y = "20" + y;
+      if(Number(y) > 2500) y = String(Number(y) - 543); // แปลงปี พ.ศ. เป็น ค.ศ.
+      document.getElementById('date').value = `${y}-${m}-${d}`;
+    }
+    
+    // ตั้งชื่อรายการเบื้องต้น
+    document.getElementById('item').value = "สแกนจากใบเสร็จ (ตรวจสอบความถูกต้อง)";
+    alert("🤖 AI สแกนใบเสร็จสำเร็จ! ตรวจสอบความถูกต้องของข้อมูลแล้วกดบันทึกได้เลยครับ");
+    
+  } catch (err) {
+    alert("ไม่สามารถอ่านข้อความจากรูปภาพได้ กรุณากรอกข้อมูลเองครับ");
+  } finally {
+    document.querySelector('.ai-banner').innerHTML = originalBtnText;
+    input.value = "";
+  }
+}
 
 // --- Per-Channel Cycle Engine ---
 function getChannelCutoff(method) {
