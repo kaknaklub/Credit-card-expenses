@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.1</title>
+<title>Credit Card & Loan Master Pro V2.2</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -34,10 +34,13 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .budget-info { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; opacity: 0.95; }
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; background: #fff; border-radius: 4px; transition: width 0.4s ease; }
-.action-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
-.action-btn { background: var(--bg); border: none; border-radius: 16px; padding: 12px 6px; box-shadow: 5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; cursor: pointer; position: relative; }
-.action-btn .icon { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-white); display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--primary); }
-.action-btn span { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+/* ปรับ Action Grid เป็น 5 ปุ่มเรียงสวยๆ */
+.action-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 24px; }
+.action-btn { background: var(--bg); border: none; border-radius: 14px; padding: 10px 4px; box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; position: relative; }
+.action-btn .icon { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-white); display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--primary); }
+.action-btn span { font-size: 10px; font-weight: 500; color: var(--text-muted); text-align: center; }
+
 .section-title { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
 .section-title h3 { margin: 0; font-size: 17px; font-weight: 600; }
 .section-title span { font-size: 12px; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
@@ -64,7 +67,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 .radio-segments span { display: block; text-align: center; padding: 9px 0; font-size: 12px; font-weight: 500; color: var(--text-muted); border-radius: 10px; cursor: pointer; }
 .radio-segments input[type="radio"]:checked + span { background: var(--primary); color: #fff; box-shadow: 0 3px 8px rgba(126, 168, 138, 0.4); }
 .btn-main { width: 100%; padding: 16px; border: none; border-radius: 16px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 5px 5px 14px rgba(126, 168, 138, 0.4), -5px -5px 14px var(--shadow-light); transition: 0.2s; }
-.ai-banner { background: #e8f4ef; border: 1.5px dashed var(--primary); border-radius: 16px; padding: 14px; margin-bottom: 16px; text-align: center; font-size: 13px; color: var(--primary-dark); cursor: pointer; }
 .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 440px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(12px); border-radius: 28px; display: flex; justify-content: space-around; align-items: center; padding: 6px 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); z-index: 50; }
 .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #a0b2a7; cursor: pointer; padding: 6px 14px; }
 .nav-item i { font-size: 18px; font-style: normal; }
@@ -89,7 +91,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.1</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.2</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -100,31 +102,12 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <!-- ส่วนแสดงยอดหนี้รายบุคคล -->
       <div class="split-badges" id="personSummary"></div>
 
-      <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-        <button class="method-breakdown-btn" style="margin-bottom:0; flex:1;" onclick="openMethodBreakdownModal()">
-          <span>💳 ยอดแยกตามช่องทาง</span>
-          <span>▼</span>
-        </button>
-        <button class="method-breakdown-btn" style="margin-bottom:0; flex:1; background: rgba(0,0,0,0.18);" onclick="openLineShareModal()">
-          <span>💬 สรุปส่ง LINE</span>
-          <span>↗</span>
-        </button>
-      </div>
+      <button class="method-breakdown-btn" onclick="openMethodBreakdownModal()">
+        <span>💳 ยอดแยกตามช่องทาง</span>
+        <span>▼</span>
+      </button>
 
-      <!-- บัตรเป้าหมายเงินออม (V2 Joint Savings Goals) -->
-      <div style="background: rgba(0,0,0,0.12); padding: 12px 14px; border-radius: 14px; margin-bottom: 10px; cursor: pointer;" onclick="openSavingsModal()">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; margin-bottom: 4px;">
-          <span>🎯 เป้าหมาย: <strong id="savingsTitleDisplay">ทริปเที่ยวด้วยกัน</strong></span>
-          <span><strong id="savingsPercentDisplay">0%</strong> (แตะเพื่อจัดการ)</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 11.5px; opacity: 0.9; margin-bottom: 6px;">
-          <span>เก็บแล้ว: <strong id="savingsCurrentDisplay">฿0.00</strong></span>
-          <span>เป้าหมาย: <strong id="savingsTargetDisplay">฿0.00</strong></span>
-        </div>
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="savingsProgressBar" style="width: 0%;"></div></div>
-      </div>
-
-      <!-- กราฟสถิติหมวดหมู่ย่อ (V2 Visual Analytics) -->
+      <!-- กราฟสถิติหมวดหมู่ย่อ (Visual Analytics) -->
       <div style="background: rgba(0,0,0,0.1); padding: 12px 14px; border-radius: 14px;" onclick="openAnalyticsModal()" style="cursor:pointer;">
         <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; opacity: 0.95;">
           <span>📊 สัดส่วนงบเดือนนี้ & หมวดหมู่</span>
@@ -135,7 +118,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
-    <!-- 🌟 นำกลับมาแล้ว: มินิแอปกระเป๋าเงินคู่รัก (Shared Wallet V1) -->
+    <!-- มินิแอปกระเป๋าเงินคู่รัก (Shared Wallet) -->
     <div style="background: var(--surface-white); border-radius: 22px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="margin: 0; font-size: 16px; color: var(--text-main);">👥 กระเป๋าเงินคู่รัก (Shared Wallet)</h3>
@@ -161,12 +144,15 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
+    <!-- เมนูด่วนด้านล่าง (Action Grid 5 ปุ่ม) ย้ายปุ่มส่ง LINE มาไว้ที่นี่ -->
     <div class="action-grid">
-      <div class="action-btn"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
+      <div class="action-btn" style="position:relative;"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
       <div class="action-btn" onclick="openBudgetModal()"><div class="icon">🎯</div><span>ตั้งงบ</span></div>
-      <div class="action-btn" onclick="exportToCSV()"><div class="icon">📊</div><span>ส่งออก CSV</span></div>
-      <div class="action-btn" onclick="openVisualReport()"><div class="icon">🖼️</div><span>สรุปพรีเมียม</span></div>
+      <div class="action-btn" onclick="openLineShareModal()"><div class="icon">💬</div><span>ส่ง LINE</span></div>
+      <div class="action-btn" onclick="exportToCSV()"><div class="icon">📊</div><span>CSV</span></div>
+      <div class="action-btn" onclick="openVisualReport()"><div class="icon">🖼️</div><span>พรีเมียม</span></div>
     </div>
+
     <div class="section-title"><h3>รายการประจำรอบบิล</h3><span id="cycleLabelText">รอบปัจจุบัน</span></div>
     <div id="entriesList"><div style="text-align:center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูล... ⏳</div></div>
   </div>
@@ -175,14 +161,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <div id="view-add" class="hidden">
     <div class="header-top"><div><p>New Transaction</p><h1>เพิ่มรายการใหม่</h1></div></div>
     
-    <!-- AI Slip OCR Simulation -->
-    <div class="ai-banner" onclick="simulateAiSlipScan()">
-      ✨ <strong>📷 อัปโหลดสลิป & จำลองระบบ AI อ่านสลิปอัตโนมัติ</strong><br>
-      <span style="font-size:11.5px; opacity:0.8;">แตะที่นี่เพื่อเลือกรูปสลิป/ใบเสร็จ แล้วให้ AI ดึงยอด วันที่ ร้านค้าให้อัตโนมัติ</span>
-    </div>
-    <input type="file" id="aiSlipInput" accept="image/*" class="hidden" onchange="processAiSlipImage(this)">
-
-    <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')" style="background:#f4f0e8; border-color:#c8b088; color:#785c30;">
+    <!-- ช่องวาง JSON จาก Gemini (คงไว้เพื่อความสะดวกและแม่นยำ) -->
+    <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')" style="background:#f4f0e8; border-color:#c8b088; color:#785c30; cursor:pointer; border-radius:16px; padding:14px; margin-bottom:16px; text-align:center; font-size:13px;">
       ✨ <strong>วางข้อมูล JSON จาก Gemini (ดึงสถานะ จ่ายแล้ว/ยังไม่จ่าย)</strong><br>
       <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด JSON นำเข้าข้อมูลและสถานะแต่ละงวด</span>
     </div>
@@ -280,19 +260,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 
 <!-- Modals ต่างๆ -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
-
-<!-- Modal จัดการเป้าหมายเงินออมร่วมกัน -->
-<div class="modal" id="savingsModal" onclick="if(event.target===this)closeSavingsModal()">
-  <div class="sheet" style="max-width: 500px;">
-    <div class="grabber"></div>
-    <h3 style="margin:0 0 10px; font-size:20px; text-align:center">🎯 จัดการเป้าหมายเงินออมร่วมกัน</h3>
-    <div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;">กำหนดชื่อเป้าหมาย ยอดเงินเป้าหมาย และยอดเงินที่เก็บสะสมได้ปัจจุบัน</div>
-    <div class="input-group"><label>ชื่อเป้าหมายร่วมกัน</label><input id="goalTitleInput" type="text" placeholder="เช่น ทริปเที่ยวญี่ปุ่นปลายปี"></div>
-    <div class="input-group"><label>ยอดเงินเป้าหมายรวม (บาท)</label><input id="goalTargetInput" type="number" min="0" step="1" placeholder="30000"></div>
-    <div class="input-group"><label>ยอดเงินที่เก็บสะสมแล้วปัจจุบัน (บาท)</label><input id="goalCurrentInput" type="number" min="0" step="1" placeholder="10000"></div>
-    <button class="btn-main" style="margin-top:10px;" onclick="saveSavingsGoal()">บันทึกเป้าหมาย</button>
-  </div>
-</div>
 
 <!-- Modal กราฟสถิติเชิงลึกแยกตามหมวดหมู่ -->
 <div class="modal" id="analyticsModal" onclick="if(event.target===this)closeAnalyticsModal()">
@@ -411,60 +378,10 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.1")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.2")) || { 
   budgets: {}, 
-  savingsGoal: { title: "ทริปเที่ยวด้วยกัน", target: 30000, current: 0 },
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
-
-// AI Slip OCR Simulation
-function simulateAiSlipScan() {
-  document.getElementById('aiSlipInput').click();
-}
-
-function processAiSlipImage(input) {
-  if (!input.files || !input.files[0]) return;
-  const file = input.files[0];
-  const btnBanner = document.querySelector('.ai-banner');
-  const originalHtml = btnBanner.innerHTML;
-  btnBanner.innerHTML = `🤖 <strong>กำลังให้ AI วิเคราะห์สลิปและใบเสร็จ...</strong><br><span style="font-size:11.5px;">โปรดรอสักครู่ ระบบกำลังสกัดข้อมูลยอดเงินและรายการ</span>`;
-  
-  setTimeout(() => {
-    const mockVendors = ["Shopee Mall", "Central Department Store", "7-Eleven", "Grab Food", "Lazada Thailand", "Cafe Amazon"];
-    const randomVendor = mockVendors[Math.floor(Math.random() * mockVendors.length)];
-    const randomAmount = (Math.floor(Math.random() * 850) + 120).toFixed(2);
-    
-    document.getElementById('item').value = randomVendor;
-    document.getElementById('amount').value = randomAmount;
-    
-    onAmountChangeForSplit();
-    autoCalculateInterest();
-    
-    btnBanner.innerHTML = originalHtml;
-    alert(`✅ AI สกัดข้อมูลจากสลิปสำเร็จ!\n- รายการ: ${randomVendor}\n- ยอดเงิน: ฿${randomAmount}\n(คุณสามารถตรวจสอบและแก้ไขข้อมูลด้านล่างก่อนกดบันทึกได้ทันที)`);
-    input.value = "";
-  }, 1200);
-}
-
-// Savings Goal Modals & Actions
-function openSavingsModal() {
-  const goal = localSettings.savingsGoal || { title: "ทริปเที่ยวด้วยกัน", target: 30000, current: 0 };
-  document.getElementById('goalTitleInput').value = goal.title;
-  document.getElementById('goalTargetInput').value = goal.target;
-  document.getElementById('goalCurrentInput').value = goal.current;
-  document.getElementById('savingsModal').classList.add('open');
-}
-function closeSavingsModal() { document.getElementById('savingsModal').classList.remove('open'); }
-function saveSavingsGoal() {
-  const title = document.getElementById('goalTitleInput').value.trim() || "เป้าหมายร่วมกัน";
-  const target = Number(document.getElementById('goalTargetInput').value) || 0;
-  const current = Number(document.getElementById('goalCurrentInput').value) || 0;
-  localSettings.savingsGoal = { title, target, current };
-  saveSettingsLocal();
-  closeSavingsModal();
-  render();
-  alert("✅ บันทึกเป้าหมายเงินออมสำเร็จ!");
-}
 
 // Visual Analytics Modal
 function openAnalyticsModal() {
@@ -538,7 +455,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.1`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.2`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -765,7 +682,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.1", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.2", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1348,7 +1265,7 @@ function render(){
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
-  // อัปเดตข้อมูลมินิแอปกระเป๋าเงินคู่รัก (Shared Wallet V1)
+  // อัปเดตข้อมูลมินิแอปกระเป๋าเงินคู่รัก
   document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent);
   document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum);
   document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
@@ -1362,15 +1279,6 @@ function render(){
               <strong style="color:${dat.rm > 0 ? '#ffdddd' : '#ffffff'}">฿${money(dat.rm)}</strong>
             </div>`; 
   }).join("");
-
-  // อัปเดตการ์ดเป้าหมายเงินออม (V2 Joint Savings Goals)
-  const goal = localSettings.savingsGoal || { title: "ทริปเที่ยวด้วยกัน", target: 30000, current: 0 };
-  const savingsPct = goal.target > 0 ? Math.min(100, (goal.current / goal.target) * 100) : 0;
-  document.getElementById("savingsTitleDisplay").textContent = goal.title;
-  document.getElementById("savingsCurrentDisplay").textContent = "฿" + money(goal.current);
-  document.getElementById("savingsTargetDisplay").textContent = "฿" + money(goal.target);
-  document.getElementById("savingsPercentDisplay").textContent = savingsPct.toFixed(0) + "%";
-  document.getElementById("savingsProgressBar").style.width = savingsPct + "%";
 
   let totalSpentInCycle = es.reduce((sum, item) => sum + getEffectiveItemData(item, k).remain, 0); 
   let budgetLimit = localSettings.budgets[k] || 0; 
