@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.2</title>
+<title>Credit Card & Loan Master Pro V2.3</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -35,7 +35,6 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .progress-bar-bg { width: 100%; height: 8px; background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden; }
 .progress-bar-fill { height: 100%; background: #fff; border-radius: 4px; transition: width 0.4s ease; }
 
-/* ปรับ Action Grid เป็น 5 ปุ่มเรียงสวยๆ */
 .action-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 24px; }
 .action-btn { background: var(--bg); border: none; border-radius: 14px; padding: 10px 4px; box-shadow: 4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; position: relative; }
 .action-btn .icon { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-white); display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--primary); }
@@ -91,7 +90,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.2</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.3</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -144,7 +143,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
-    <!-- เมนูด่วนด้านล่าง (Action Grid 5 ปุ่ม) ย้ายปุ่มส่ง LINE มาไว้ที่นี่ -->
+    <!-- เมนูด่วนด้านล่าง (Action Grid 5 ปุ่ม) -->
     <div class="action-grid">
       <div class="action-btn" style="position:relative;"><div class="icon">📅</div><span>รอบบิล</span><select id="cycleSelect" onchange="userChangedCycle=true; render()" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer"></select></div>
       <div class="action-btn" onclick="openBudgetModal()"><div class="icon">🎯</div><span>ตั้งงบ</span></div>
@@ -161,7 +160,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <div id="view-add" class="hidden">
     <div class="header-top"><div><p>New Transaction</p><h1>เพิ่มรายการใหม่</h1></div></div>
     
-    <!-- ช่องวาง JSON จาก Gemini (คงไว้เพื่อความสะดวกและแม่นยำ) -->
     <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')" style="background:#f4f0e8; border-color:#c8b088; color:#785c30; cursor:pointer; border-radius:16px; padding:14px; margin-bottom:16px; text-align:center; font-size:13px;">
       ✨ <strong>วางข้อมูล JSON จาก Gemini (ดึงสถานะ จ่ายแล้ว/ยังไม่จ่าย)</strong><br>
       <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ด JSON นำเข้าข้อมูลและสถานะแต่ละงวด</span>
@@ -185,7 +183,6 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div class="input-group hidden" id="ownerCustomContainer"><input id="ownerCustom" type="text" placeholder="ระบุชื่อ..."></div>
     
-    <!-- สัดส่วนการหารแบบยืดหยุ่นรายรายการ -->
     <div id="customSplitContainer" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <label style="font-size:12.5px; font-weight:600; margin-bottom:6px; display:block;">สัดส่วนการหารยืดหยุ่น (Nu & B)</label>
       <div class="radio-segments" style="margin-bottom:10px;">
@@ -378,7 +375,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.2")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.3")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
@@ -455,7 +452,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.2`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.3`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -682,7 +679,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.2", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.3", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1468,16 +1465,17 @@ function openSettings(){
   
   channelNames.forEach(ch => { 
     let dat = channels[ch] || { cutoff: 17, due: 30, budget: 0 }; 
+    let safeId = ch.replace('/', '_'); // ป้องกันปัญหาสัญลักษณ์สแลชใน ID ของ DOM
     html += `
       <div style="background:var(--bg); padding:14px; border-radius:14px; margin-bottom:14px;">
         <strong>🏷️ ${ch}</strong>
         <div style="display:flex; gap:10px; margin-top:8px;">
-          <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${ch}" value="${dat.cutoff}" min="1" max="28"></div>
-          <div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${ch}" value="${dat.due}" min="1" max="31"></div>
+          <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${safeId}" value="${dat.cutoff}" min="1" max="28"></div>
+          <div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${safeId}" value="${dat.due}" min="1" max="31"></div>
         </div>
         <div style="margin-top:10px;">
           <label style="font-size:11px;">งบประมาณช่องทางนี้ (บาท)</label>
-          <input type="number" id="budget-${ch}" value="${dat.budget || 0}" min="0" step="1" placeholder="0">
+          <input type="number" id="budget-${safeId}" value="${dat.budget || 0}" min="0" step="1" placeholder="0">
         </div>
       </div>`; 
   });
@@ -1491,10 +1489,11 @@ function closeSettings(){ document.getElementById("settingsModal").classList.rem
 function saveSettings(){ 
   let newChannels = {}; 
   ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { 
+    let safeId = ch.replace('/', '_');
     newChannels[ch] = { 
-      cutoff: Number(document.getElementById(`cutoff-${ch}`).value)||17, 
-      due: Number(document.getElementById(`due-${ch}`).value)||30,
-      budget: Number(document.getElementById(`budget-${ch}`).value)||0
+      cutoff: Number(document.getElementById(`cutoff-${safeId}`).value)||17, 
+      due: Number(document.getElementById(`due-${safeId}`).value)||30,
+      budget: Number(document.getElementById(`budget-${safeId}`).value)||0
     }; 
   });
   localSettings.channels = newChannels; 
