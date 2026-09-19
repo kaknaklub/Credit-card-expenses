@@ -882,7 +882,8 @@ function openMethodBreakdownModal() {
     if (matchCycle) { 
       const eff = getEffectiveItemData(x, k); 
       if(!breakdown[m]) breakdown[m] = { total: 0, items: [] }; 
-      breakdown[m].total += eff.amount; 
+      // 🌟 ใช้ยอดคงเหลือ (eff.remain) แทนยอดเต็ม เพื่อให้ยอดหนี้ในช่องทางลดลงเมื่อถูกชำระแล้ว
+      breakdown[m].total += eff.remain; 
       breakdown[m].items.push({ item: x.item, owner: x.owner, amount: eff.amount, remain: eff.remain }); 
     }
   });
@@ -908,7 +909,7 @@ function openMethodBreakdownModal() {
           <div style="margin-top:8px; margin-bottom:8px; background:var(--surface-white); padding:8px 10px; border-radius:10px; font-size:12px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
               <span>งบช่องทาง: <strong>฿${money(chBudget)}</strong></span>
-              <span>เหลือใช้: <strong style="color:${remainBudget >= 0 ? 'var(--primary-dark)' : 'var(--danger)'}">฿${money(remainBudget)}</strong></span>
+              <span>หนี้คงเหลือช่องทางนี้: <strong style="color:${dat.total > 0 ? 'var(--danger)' : 'var(--primary-dark)'}">฿${money(dat.total)}</strong></span>
             </div>
             <div style="width:100%; height:6px; background:var(--shadow-dark); border-radius:3px; overflow:hidden;">
               <div style="width:${percent}%; height:100%; background:${percent > 100 ? 'var(--danger)' : 'var(--primary)'}; border-radius:3px;"></div>
@@ -932,7 +933,8 @@ function openMethodBreakdownModal() {
         html += `<div style="text-align:center; padding:8px; color:var(--text-muted); font-size:12px;">ไม่มีรายการในช่องทางนี้</div>`;
       } else {
         dat.items.forEach(i => { 
-          html += `<div style="display:flex; justify-content:space-between; margin-bottom:6px; background:var(--surface-white); padding:6px 10px; border-radius:8px;"><span>• ${esc(i.item)} (${esc(i.owner)})</span><strong>฿${money(i.amount)}</strong></div>`; 
+          let statusText = i.remain > 0 ? `ค้าง ฿${money(i.remain)}` : `<span style="color:var(--primary)">ครบแล้ว ✓</span>`;
+          html += `<div style="display:flex; justify-content:space-between; margin-bottom:6px; background:var(--surface-white); padding:6px 10px; border-radius:8px;"><span>• ${esc(i.item)} (${esc(i.owner)})</span><strong>${statusText}</strong></div>`; 
         }); 
       }
       
