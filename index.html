@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.2</title>
+<title>Credit Card & Loan Master Pro V2.9.3</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -90,7 +90,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.2</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.3</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -438,7 +438,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.2")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.3")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
@@ -541,26 +541,29 @@ async function confirmBulkRepay() {
         let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid);
         if (targetSchedule) {
           targetSchedule.paid = true;
+          targetSchedule.image = finalSlip;
+          targetSchedule.paidDate = date;
+          targetSchedule.payer = payer;
           await db.collection("entries").doc(id).update({ installmentPlan: e.installmentPlan });
         }
-      }
-
-      if (payer === "obligation") {
-        let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
-        let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
-        let newRepays = [];
-        if (nuBreak.remain > 0) {
-          newRepays.push({ id: Date.now().toString() + '_nu_' + Math.random().toString(36).substring(2,5), date, amount: nuBreak.remain, payer: "Nu", image: finalSlip });
-        }
-        if (bBreak.remain > 0) {
-          newRepays.push({ id: Date.now().toString() + '_b_' + Math.random().toString(36).substring(2,5), date, amount: bBreak.remain, payer: "B", image: finalSlip });
-        }
-        if (newRepays.length > 0) {
-          await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
-        }
       } else {
-        const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
-        await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+        if (payer === "obligation") {
+          let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
+          let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
+          let newRepays = [];
+          if (nuBreak.remain > 0) {
+            newRepays.push({ id: Date.now().toString() + '_nu_' + Math.random().toString(36).substring(2,5), date, amount: nuBreak.remain, payer: "Nu", image: finalSlip });
+          }
+          if (bBreak.remain > 0) {
+            newRepays.push({ id: Date.now().toString() + '_b_' + Math.random().toString(36).substring(2,5), date, amount: bBreak.remain, payer: "B", image: finalSlip });
+          }
+          if (newRepays.length > 0) {
+            await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
+          }
+        } else {
+          const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
+          await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+        }
       }
     }
 
@@ -646,7 +649,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.2`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.3`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -854,13 +857,16 @@ async function addEntry(){
       let [y, m, d] = (document.getElementById("addStartDate").value || date).split("-").map(Number);
       
       for(let i=1; i<=months; i++) {
-        let isPaid = false; let scheduleDueDate = null;
+        let isPaid = false; let scheduleDueDate = null; let schedImage = null; let schedPaidDate = null; let schedPayer = null;
         if (window._importedSchedules && window._importedSchedules[i-1] !== undefined) {
           isPaid = !!window._importedSchedules[i-1].paid;
           if (window._importedSchedules[i-1].dueDate) scheduleDueDate = window._importedSchedules[i-1].dueDate;
+          if (window._importedSchedules[i-1].image) schedImage = window._importedSchedules[i-1].image;
+          if (window._importedSchedules[i-1].paidDate) schedPaidDate = window._importedSchedules[i-1].paidDate;
+          if (window._importedSchedules[i-1].payer) schedPayer = window._importedSchedules[i-1].payer;
         }
         if(!scheduleDueDate) { let payDateObj = new Date(y, m - 1 + (i - 1), d); scheduleDueDate = `${payDateObj.getFullYear()}-${pad(payDateObj.getMonth() + 1)}-${pad(payDateObj.getDate())}`; }
-        schedules.push({ no: i, dueDate: scheduleDueDate, amount: Number(perMonth.toFixed(2)), paid: isPaid });
+        schedules.push({ no: i, dueDate: scheduleDueDate, amount: Number(perMonth.toFixed(2)), paid: isPaid, image: schedImage, paidDate: schedPaidDate, payer: schedPayer });
       }
       window._importedSchedules = null; 
       entryData.isInstallment = true;
@@ -873,7 +879,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.2", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.3", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -948,7 +954,7 @@ async function confirmChangeOwner() {
 
 function openConvertInstModal(id) { const e = entries.find(x => x.id === id); if(!e) return; document.getElementById("convertEntryId").value = id; document.getElementById("convertInstItemName").textContent = `${e.item} (฿${money(e.amount)})`; const now = new Date(); document.getElementById("ciStartDate").value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("convertInstModal").classList.add("open"); }
 function closeConvertInstModal() { document.getElementById("convertInstModal").classList.remove("open"); }
-async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จ!"); }
+async function confirmConvertToInstallment() { const id = document.getElementById("convertEntryId").value; const e = entries.find(x => x.id === id); if(!e) return; const months = Number(document.getElementById("ciMonths").value) || 10; const annualInterest = Number(document.getElementById("ciInterest").value) || 0; const startDateStr = document.getElementById("ciStartDate").value || e.date; let totalInterest = e.amount * (annualInterest / 100) * (months / 12); let totalToPay = e.amount + totalInterest; let perMonth = totalToPay / months; let schedules = []; let [y, m, d] = startDateStr.split("-").map(Number); for(let i=1; i<=months; i++) { let payDateObj = new Date(y, m - 1 + (i - 1), d); let pY = payDateObj.getFullYear(); let pM = pad(payDateObj.getMonth() + 1); let pD = pad(payDateObj.getDate()); schedules.push({ no: i, dueDate: `${pY}-${pM}-${pD}`, amount: Number(perMonth.toFixed(2)), paid: false, image: null, paidDate: null, payer: null }); } const installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules }; await db.collection("entries").doc(id).update({ isInstallment: true, installmentPlan }); closeConvertInstModal(); refreshCycles(); alert("แปลงเป็นรายการผ่อนสำเร็จ!"); }
 
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
@@ -1061,13 +1067,9 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       let shares = {};
       owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); });
       
-      let scheduleRepayments = [...(x.repayments || [])].map(r => ({
-        amount: r.amount / matchingSchedules.length,
-        payer: r.payer,
-        image: r.image
-      }));
+      let scheduleRepayments = [];
       if (s.paid) {
-        scheduleRepayments.push({ amount: scheduleTotal, payer: "", image: null });
+        scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || "", image: s.image });
       }
 
       let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
@@ -1175,41 +1177,57 @@ async function confirmRepay(){
       let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid); 
       if (targetSchedule) { 
         targetSchedule.paid = true; 
+        targetSchedule.image = b64Img;
+        targetSchedule.paidDate = date;
+        targetSchedule.payer = payer;
         await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan }); 
       } 
-    }
-
-    if (payer === "obligation") {
-      let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
-      let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
-      let totalRemainObligation = nuBreak.remain + bBreak.remain;
-
-      let newRepays = [];
-      if (totalRemainObligation > 0) {
-        let effectiveAmt = Math.min(amt, totalRemainObligation);
-        let nuPay = effectiveAmt * (nuBreak.remain / totalRemainObligation);
-        let bPay = effectiveAmt * (bBreak.remain / totalRemainObligation);
-
-        if (nuPay > 0.005) {
-          newRepays.push({ id: Date.now().toString() + '_nu', date, amount: Number(nuPay.toFixed(2)), payer: "Nu", image: b64Img });
-        }
-        if (bPay > 0.005) {
-          newRepays.push({ id: Date.now().toString() + '_b', date, amount: Number(bPay.toFixed(2)), payer: "B", image: b64Img });
-        }
-      }
-      if (newRepays.length > 0) {
-        await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
-      }
     } else {
-      const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; 
-      await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); 
+      if (payer === "obligation") {
+        let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
+        let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
+        let totalRemainObligation = nuBreak.remain + bBreak.remain;
+
+        let newRepays = [];
+        if (totalRemainObligation > 0) {
+          let effectiveAmt = Math.min(amt, totalRemainObligation);
+          let nuPay = effectiveAmt * (nuBreak.remain / totalRemainObligation);
+          let bPay = effectiveAmt * (bBreak.remain / totalRemainObligation);
+
+          if (nuPay > 0.005) {
+            newRepays.push({ id: Date.now().toString() + '_nu', date, amount: Number(nuPay.toFixed(2)), payer: "Nu", image: b64Img });
+          }
+          if (bPay > 0.005) {
+            newRepays.push({ id: Date.now().toString() + '_b', date, amount: Number(bPay.toFixed(2)), payer: "B", image: b64Img });
+          }
+        }
+        if (newRepays.length > 0) {
+          await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
+        }
+      } else {
+        const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; 
+        await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); 
+      }
     }
 
     closeRepayModal();
   } catch (err) { alert("เกิดข้อผิดพลาด"); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; }
 }
 
-function deleteRepay(eid, rid){ if(confirm("ลบประวัติการชำระคืน?")){ const e = entries.find(x => x.id === eid); const updatedRepayments = e.repayments.filter(r => r.id !== rid); db.collection("entries").doc(eid).update({ repayments: updatedRepayments }); } }
+async function deleteRepay(eid, rid, isInstSchedule = false, scheduleNo = null){ 
+  if(confirm("ลบประวัติการชำระคืน?")){ 
+    const e = entries.find(x => x.id === eid); 
+    if(!e) return;
+    if(isInstSchedule && scheduleNo !== null && e.installmentPlan) {
+      let plan = e.installmentPlan;
+      plan.schedules = plan.schedules.map(s => s.no === scheduleNo ? { ...s, paid: false, image: null, paidDate: null, payer: null } : s);
+      await db.collection("entries").doc(eid).update({ installmentPlan: plan });
+    } else {
+      const updatedRepayments = e.repayments.filter(r => r.id !== rid); 
+      await db.collection("entries").doc(eid).update({ repayments: updatedRepayments }); 
+    }
+  } 
+}
 
 let currentInstEntryId = null;
 function openInstallmentModal(id) {
@@ -1235,8 +1253,28 @@ function openInstallmentModal(id) {
   renderInstSchedules(plan.schedules); document.getElementById("installmentModal").classList.add("open");
 }
 function closeInstModal() { document.getElementById("installmentModal").classList.remove("open"); currentInstEntryId = null; }
-function renderInstSchedules(schedules) { let html = `<table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; schedules.forEach(s => { html += `<tr><td><strong>งวดที่ ${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary);">จ่ายแล้ว ✓</span>' : '<span style="color:var(--danger)">รอจ่าย</span>'}</td><td><button class="btn-main" style="padding:4px 8px; font-size:11px; border-radius:6px;" onclick="toggleInstPay(${s.no})">${s.paid ? 'ยกเลิก' : 'จ่ายงวดนี้'}</button></td></tr>`; }); document.getElementById("instSchedulesList").innerHTML = html + `</table>`; }
-async function toggleInstPay(no) { const e = entries.find(x => x.id === currentInstEntryId); if(!e || !e.installmentPlan) return; let plan = e.installmentPlan; plan.schedules = plan.schedules.map(s => s.no === no ? { ...s, paid: !s.paid } : s); await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); openInstallmentModal(currentInstEntryId); }
+function renderInstSchedules(schedules) { 
+  let html = `<table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; 
+  schedules.forEach(s => { 
+    let slipIcon = s.image ? `<span style="cursor:pointer; margin-left:4px; font-size:14px;" onclick="viewImage('${s.image}')" title="ดูสลิป">📷</span>` : "";
+    html += `<tr><td><strong>งวดที่ ${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary);">จ่ายแล้ว ✓</span>' + slipIcon : '<span style="color:var(--danger)">รอจ่าย</span>'}</td><td><button class="btn-main" style="padding:4px 8px; font-size:11px; border-radius:6px;" onclick="toggleInstPay(${s.no})">${s.paid ? 'ยกเลิก' : 'จ่ายงวดนี้'}</button></td></tr>`; 
+  }); 
+  document.getElementById("instSchedulesList").innerHTML = html + `</table>`; 
+}
+async function toggleInstPay(no) { 
+  const e = entries.find(x => x.id === currentInstEntryId); 
+  if(!e || !e.installmentPlan) return; 
+  let plan = e.installmentPlan; 
+  plan.schedules = plan.schedules.map(s => {
+    if(s.no === no) {
+      let nextPaid = !s.paid;
+      return { ...s, paid: nextPaid, image: nextPaid ? s.image : null, paidDate: nextPaid ? (s.paidDate || new Date().toISOString().split('T')[0]) : null, payer: nextPaid ? (s.payer || "Nu") : null };
+    }
+    return s;
+  }); 
+  await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); 
+  openInstallmentModal(currentInstEntryId); 
+}
 
 function openBudgetModal() { const k = document.getElementById("cycleSelect").value; document.getElementById("budgetInputAmt").value = localSettings.budgets[k] || ''; document.getElementById("budgetModal").classList.add("open"); }
 function closeBudgetModal() { document.getElementById("budgetModal").classList.remove("open"); }
@@ -1444,6 +1482,15 @@ function render(){
             if (r.payer === "B") bPaidSum += r.amount;
           });
         }
+        if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+          let m = x.method || "CreditCard";
+          x.installmentPlan.schedules.forEach(s => {
+            if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
+              if (s.payer === "Nu") nuPaidSum += s.amount;
+              if (s.payer === "B") bPaidSum += s.amount;
+            }
+          });
+        }
       }
       
       owners.forEach(ownerName => {
@@ -1456,15 +1503,30 @@ function render(){
       });
 
       let hHtml = ""; 
+      let repList = [];
       if(x.repayments && x.repayments.length > 0) {
-        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${x.repayments.map(r => {
+        repList = x.repayments.map(r => ({ type: 'normal', id: r.id, date: r.date, payer: r.payer, amount: r.amount, image: r.image }));
+      }
+      if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+        let m = x.method || "CreditCard";
+        x.installmentPlan.schedules.forEach(s => {
+          if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
+            repList.push({ type: 'installment', no: s.no, date: s.paidDate || s.dueDate, payer: s.payer, amount: s.amount, image: s.image });
+          }
+        });
+      }
+
+      if(repList.length > 0) {
+        hHtml = `<div style="margin-top:10px; padding:10px; background:var(--bg); border-radius:12px;">${repList.map(r => {
           let slipBtn = r.image ? `<span style="cursor:pointer; margin-right:8px; font-size:14px;" onclick="viewImage('${r.image}')" title="ดูรูปสลิป">📷</span>` : "";
+          let titleText = r.type === 'installment' ? `งวดที่ ${r.no}${r.payer ? '('+r.payer+')' : ''}` : `${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}`;
+          let deleteAction = r.type === 'installment' ? `deleteRepay('${x.id}', null, true,${r.no})` : `deleteRepay('${x.id}', '${r.id}')`;
           return `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--shadow-dark); padding:6px 0;">
-            <span style="font-size:12px">${fmtDate(r.date)}${r.payer ? '('+r.payer+')' : ''}</span>
+            <span style="font-size:12px">${titleText}</span>
             <div>
               ${slipBtn}
               <strong style="font-size:13px; margin-right:8px">฿${money(r.amount)}</strong>
-              <button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="deleteRepay('${x.id}', '${r.id}')">✕</button>
+              <button style="border:none; background:transparent; color:var(--danger); cursor:pointer" onclick="${deleteAction}">✕</button>
             </div>
           </div>`;
         }).join("")}</div>`;
