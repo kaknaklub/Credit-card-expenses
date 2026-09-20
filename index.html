@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.10.0</title>
+<title>Credit Card & Expense Master Pro V2.11.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -92,7 +92,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.10.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.11.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -160,7 +160,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
 
     <div class="section-title">
-      <h3>รายการประจำรอบบิล <span id="entryCountBadge" style="font-size:13px; font-weight:normal; color:var(--text-muted);">(0 รายการ)</span></h3>
+      <h3>รายการประจำรอบ/เดือน <span id="entryCountBadge" style="font-size:13px; font-weight:normal; color:var(--text-muted);">(0 รายการ)</span></h3>
       <div>
         <span id="cycleLabelText" style="color:var(--text-muted); font-weight:500;">รอบปัจจุบัน</span>
       </div>
@@ -214,7 +214,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
         <option value="SPayLater">SPayLater</option>
         <option value="Lazada">Lazada / LazPayLater</option>
         <option value="ShopeePay">ShopeePay</option>
-        <option value="Cash/Transfer">เงินสด / โอน</option>
+        <option value="Cash/Transfer">เงินสด / โอน (ตัดรอบเดือนปฏิทิน)</option>
         <option value="Other">อื่นๆ</option>
       </select>
     </div>
@@ -267,7 +267,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.10.0) -->
+<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.11.0) -->
 <div class="modal" id="entryDetailModal" onclick="if(event.target===this)closeEntryDetailModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -277,7 +277,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.10.0) -->
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.11.0) -->
 <div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -490,12 +490,11 @@ const defaultChannels = {
   "Other": { cutoff: 31, due: 31, budget: 0 } 
 };
 
-let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.8"));
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9"));
 let localSettings = savedSettings || { budgets: {}, channels: defaultChannels };
-// นำช่องทางพื้นฐานมารวมกับช่องทางที่เซฟไว้ ป้องกันช่องทางใหม่หายหรือตกหล่น
 localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
 
-// --- ENTRY DETAIL MODAL LOGIC (V2.10.0) ---
+// --- ENTRY DETAIL MODAL LOGIC (V2.11.0) ---
 function openEntryDetailModal(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
@@ -647,14 +646,14 @@ function openPaymentHistoryModal() {
     }
   });
 
-  document.getElementById("payHistCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)} (${cachedPaymentHistoryItems.length} รายการที่ชำระแล้ว)`;
+  document.getElementById("payHistCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)} (${cachedPaymentHistoryItems.length} รายการที่ชำระแล้ว)`;
 
   let summaryBoxHtml = "";
   if (cachedPaymentHistoryItems.length > 0) {
     let chips = Object.keys(payerSummary).map(p => `<div style="background:rgba(255,255,255,0.2); padding:5px 10px; border-radius:10px; font-size:11.5px; backdrop-filter:blur(4px);">👤 ${esc(p)}: <strong>฿${money(payerSummary[p])}</strong></div>`).join("");
     summaryBoxHtml = `
       <div style="background:linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius:20px; padding:16px; color:#fff; margin-bottom:14px; box-shadow:0 6px 18px rgba(126,168,138,0.3);">
-        <div style="font-size:11.5px; opacity:0.9; text-transform:uppercase; letter-spacing:0.5px;">ยอดชำระสำเร็จรวมในรอบบิลนี้</div>
+        <div style="font-size:11.5px; opacity:0.9; text-transform:uppercase; letter-spacing:0.5px;">ยอดชำระสำเร็จรวมในรอบ/เดือนนี้</div>
         <div style="font-size:26px; font-weight:700; margin:4px 0 10px; letter-spacing:-0.5px;">฿${money(totalHistAmt)}</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">${chips}</div>
       </div>`;
@@ -770,8 +769,8 @@ async function cancelPaymentItem(entryId, type, idOrNo) {
 // --- BULK REPAYMENT LOGIC ---
 function openBulkRepayModal() {
   const k = document.getElementById("cycleSelect").value;
-  if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
-  document.getElementById("bulkModalCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  if(!k) return alert("กรุณาเลือกรอบ/เดือนก่อนครับ");
+  document.getElementById("bulkModalCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
   
   const es = entries.filter(x => { 
     let m = x.method || "CreditCard"; 
@@ -801,7 +800,7 @@ function openBulkRepayModal() {
   document.getElementById("bulkSelectListLabel").textContent = `เลือกรายการที่ต้องการเคลียร์หนี้ (${unpaidCount} รายการ):`;
 
   if(unpaidCount === 0) {
-    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค้างชำระในรอบบิลนี้ 🎉</div>`;
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค้างชำระในรอบ/เดือนนี้ 🎉</div>`;
   }
 
   document.getElementById("bulkItemsContainer").innerHTML = html;
@@ -906,7 +905,7 @@ async function confirmBulkRepay() {
 // Visual Analytics Modal
 function openAnalyticsModal() {
   const k = document.getElementById("cycleSelect").value;
-  document.getElementById("analyticsCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  document.getElementById("analyticsCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
   
   const es = entries.filter(x => { 
     let m = x.method || "CreditCard"; 
@@ -926,7 +925,7 @@ function openAnalyticsModal() {
   let html = "";
   const catKeys = Object.keys(catMap);
   if (catKeys.length === 0) {
-    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ยังไม่มีข้อมูลค่าใช้จ่ายในรอบบิลนี้</div>`;
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ยังไม่มีข้อมูลค่าใช้จ่ายในรอบ/เดือนนี้</div>`;
   } else {
     html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">พบหมวดหมู่การใช้จ่ายทั้งหมด (${catKeys.length} หมวดหมู่):</div>`;
     for (let cat in catMap) {
@@ -971,13 +970,13 @@ function openLineShareModal() {
     });
   });
 
-  let text = `📢 สรุปยอดค่าใช้จ่ายรอบบิล (${cycleLabel(k)})\n`;
+  let text = `📢 สรุปยอดค่าใช้จ่ายรอบ/เดือน (${cycleLabel(k)})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
   text += `💰 ยอดค้างรวมทั้งหมด (${es.length} รายการ): ฿${money(tR)}\n\n`;
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.10.0`;
+  text += `✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1207,7 +1206,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.10.0", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.11.0", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1238,7 +1237,13 @@ function compressImage(file) { return new Promise((resolve) => { if(!file) retur
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
 
-// ฟังก์ชันดึงวันตัดรอบ (พร้อมระบบป้องกันค่าตกหล่น)
+// --- Dual-Engine Architecture (V2.11.0) ---
+// แยกประเภทช่องทาง: เงินสด/โอน/กระเป๋าเงิน (cash) คิดตามเดือนปฏิทิน | บัตรเครดิต/สินเชื่อ (credit) คิดตามรอบบิลตัดรอบ
+function getChannelType(method) {
+  if (["Cash/Transfer", "ShopeePay", "Other"].includes(method)) return 'cash';
+  return 'credit';
+}
+
 function getChannelCutoff(method) { 
   let ch = localSettings.channels[method]; 
   if(!ch) {
@@ -1249,7 +1254,20 @@ function getChannelCutoff(method) {
   return Number(ch.cutoff) || 17; 
 }
 
-function keyFromDateForMethod(dateStr, method) { const d = parseDate(dateStr); const c = getChannelCutoff(method); if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; let n = new Date(d.getFullYear(), d.getMonth()+1, 1); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
+function keyFromDateForMethod(dateStr, method) { 
+  const d = parseDate(dateStr); 
+  if (getChannelType(method) === 'cash') {
+    // เงินสด/โอน คิดตามเดือนปฏิทินจริง (YYYY-MM)
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+  } else {
+    // บัตรเครดิต/สินเชื่อ คิดตามวันตัดรอบบิล
+    const c = getChannelCutoff(method); 
+    if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; 
+    let n = new Date(d.getFullYear(), d.getMonth()+1, 1); 
+    return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; 
+  }
+}
+
 function keyFromDate(s){ return keyFromDateForMethod(s, "CreditCard"); }
 
 function cycleLabel(k){ 
@@ -1257,11 +1275,33 @@ function cycleLabel(k){
   let c = getChannelCutoff("CreditCard"); 
   let end = new Date(y, m-1, c); 
   let start = new Date(y, m-2, c + 1); 
-  return `${pad(start.getDate())}/${pad(start.getMonth()+1)}/${start.getFullYear()} - ${pad(end.getDate())}/${pad(end.getMonth()+1)}/${end.getFullYear()}`; 
+  const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+  let monthName = thaiMonths[m-1];
+  return `${monthName} ${y+543} (บิลบัตร: ${pad(start.getDate())}/${pad(start.getMonth()+1)} - ${pad(end.getDate())}/${pad(end.getMonth()+1)})`; 
 }
 
-function allKeys(){ let keysSet = new Set(); const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`); keysSet.add(nowKey); entries.forEach(x => { let m = x.method || "CreditCard"; if(x.date) keysSet.add(keyFromDateForMethod(x.date, m)); if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) { x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(keyFromDateForMethod(s.dueDate, m)); }); } }); return Array.from(keysSet).sort().reverse(); }
-function refreshCycles(){ let ks = allKeys(); const s = document.getElementById("cycleSelect"); const nowKey = keyFromDate(`${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`); const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]); s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join(""); if(ks.includes(targetKey)) s.value = targetKey; }
+function allKeys(){ 
+  let keysSet = new Set(); 
+  const nowKey = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}`;
+  keysSet.add(nowKey); 
+  entries.forEach(x => { 
+    let m = x.method || "CreditCard"; 
+    if(x.date) keysSet.add(keyFromDateForMethod(x.date, m)); 
+    if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) { 
+      x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(keyFromDateForMethod(s.dueDate, m)); }); 
+    } 
+  }); 
+  return Array.from(keysSet).sort().reverse(); 
+}
+
+function refreshCycles(){ 
+  let ks = allKeys(); 
+  const s = document.getElementById("cycleSelect"); 
+  const nowKey = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}`;
+  const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]); 
+  s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join(""); 
+  if(ks.includes(targetKey)) s.value = targetKey; 
+}
 
 function toggleOwnerInput(){ 
   const ownerVal = document.querySelector('input[name="owner"]:checked').value;
@@ -1614,7 +1654,7 @@ function checkDueAlerts(currentCycleKey) { const banner = document.getElementByI
 
 function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value; 
-  document.getElementById("methodModalCycleLabel").textContent = `อิงรอบบิลหลัก: ${cycleLabel(k)}`;
+  document.getElementById("methodModalCycleLabel").textContent = `อิงรอบ/เดือน: ${cycleLabel(k)}`;
   const channels = localSettings.channels || {}; 
   let breakdown = {};
   
@@ -1636,7 +1676,7 @@ function openMethodBreakdownModal() {
   Object.keys(breakdown).forEach(m => allChannelsSet.add(m));
 
   if (allChannelsSet.size === 0) {
-    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลในรอบบิลนี้</div>`;
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลในรอบ/เดือนนี้</div>`;
   } else { 
     allChannelsSet.forEach(method => { 
       let dat = breakdown[method] || { totalRemain: 0, totalSpent: 0, items: [] };
@@ -1702,7 +1742,7 @@ function closeMethodBreakdownModal() { document.getElementById("methodBreakdownM
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; 
   document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
-  document.getElementById("personModalSubtitle").textContent = `รอบบิล: ${cycleLabel(k)}`;
+  document.getElementById("personModalSubtitle").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
   
   const matchedEntries = entries.filter(x => { 
     let m = x.method || "CreditCard"; 
@@ -1793,7 +1833,6 @@ function render(){
   checkDueAlerts(k);
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
   
-  // อัปเดตจำนวนรายการกำกับไว้ที่หัวข้อหน้าหลัก
   document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
 
   let tR = 0; 
@@ -1896,7 +1935,7 @@ function render(){
 }
 
 function openVisualReport() {
-  const k = document.getElementById("cycleSelect").value; if(!k) return alert("กรุณาเลือกรอบบิล");
+  const k = document.getElementById("cycleSelect").value; if(!k) return alert("กรุณาเลือกรอบ/เดือน");
   document.getElementById("reportCycleLabel").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   
   let categoriesSet = new Set();
@@ -1979,7 +2018,7 @@ function filterVisualReport() {
 
 function exportToCSV() {
   const k = document.getElementById("cycleSelect").value;
-  if (!k) { alert("กรุณาเลือกรอบบิลก่อนครับ"); return; }
+  if (!k) { alert("กรุณาเลือกรอบ/เดือนก่อนครับ"); return; }
   
   let flatList = [];
   entries.forEach(x => { 
@@ -2036,11 +2075,11 @@ function exportToCSV() {
     }
   });
 
-  if (flatList.length === 0) { alert("ไม่มีข้อมูลในรอบบิลนี้ครับ"); return; }
+  if (flatList.length === 0) { alert("ไม่มีข้อมูลในรอบ/เดือนนี้ครับ"); return; }
   flatList.sort((a, b) => a.sortDate.localeCompare(b.sortDate));
 
   let csvContent = "\uFEFF";
-  csvContent += "รอบบิลที่เลือก,วันที่,รายการ,ผู้จ่าย,ช่องทาง,หมวดหมู่,ยอดต่องวด (บาท),จ่ายคืนแล้ว (บาท),ค้างชำระ (บาท),Order No.,Transaction No.,หมายเหตุ\n";
+  csvContent += "รอบ/เดือนที่เลือก,วันที่,รายการ,ผู้จ่าย,ช่องทาง,หมวดหมู่,ยอดต่องวด (บาท),จ่ายคืนแล้ว (บาท),ค้างชำระ (บาท),Order No.,Transaction No.,หมายเหตุ\n";
   let cycleDisplay = cycleLabel(k);
 
   flatList.forEach(r => { 
@@ -2061,7 +2100,7 @@ function exportToCSV() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `Cycle_Report_${k}.csv`);
+  link.setAttribute("download", `Expense_Report_${k}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
