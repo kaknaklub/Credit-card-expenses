@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.7</title>
+<title>Credit Card & Loan Master Pro V2.9.8</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -92,7 +92,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.7</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.9.8</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -160,7 +160,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
 
     <div class="section-title">
-      <h3>รายการประจำรอบบิล</h3>
+      <h3>รายการประจำรอบบิล <span id="entryCountBadge" style="font-size:13px; font-weight:normal; color:var(--text-muted);">(0 รายการ)</span></h3>
       <div>
         <span id="cycleLabelText" style="color:var(--text-muted); font-weight:500;">รอบปัจจุบัน</span>
       </div>
@@ -267,7 +267,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.9.7) -->
+<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.9.8) -->
 <div class="modal" id="entryDetailModal" onclick="if(event.target===this)closeEntryDetailModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -277,7 +277,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.9.7) -->
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.9.8) -->
 <div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -479,12 +479,12 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.7")) || { 
+let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.8")) || { 
   budgets: {}, 
   channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
 };
 
-// --- ENTRY DETAIL MODAL LOGIC (V2.9.7) ---
+// --- ENTRY DETAIL MODAL LOGIC (V2.9.8) ---
 function openEntryDetailModal(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
@@ -961,7 +961,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.7`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.8`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1191,7 +1191,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.7", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.8", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1759,6 +1759,9 @@ function render(){
   checkDueAlerts(k);
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
   
+  // อัปเดตจำนวนรายการกำกับไว้ที่หัวข้อ
+  document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
+
   let tR = 0; 
   let pD = {
     "Nu": { s: 0, p: 0, rm: 0 },
