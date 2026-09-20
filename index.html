@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Loan Master Pro V2.9.6</title>
+<title>Credit Card & Loan Master Pro V2.10.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -44,7 +44,8 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .section-title h3 { margin: 0; font-size: 17px; font-weight: 600; }
 .section-title div { display: flex; align-items: center; gap: 10px; }
 .section-title span { font-size: 12px; color: var(--primary-dark); font-weight: 600; cursor: pointer; }
-.entry-card { background: var(--surface-white); border-radius: 18px; padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; gap: 12px; align-items: center; }
+.entry-card { background: var(--surface-white); border-radius: 18px; padding: 14px; margin-bottom: 14px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; gap: 12px; align-items: center; cursor: pointer; transition: transform 0.1s; }
+.entry-card:active { transform: scale(0.98); }
 .entry-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); overflow: hidden; }
 .entry-icon img { width: 100%; height: 100%; object-fit: cover; }
 .entry-details { flex: 1; overflow: hidden; }
@@ -91,7 +92,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Loan Master V2.9.6</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Loan Master V2.10.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -159,10 +160,9 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
 
     <div class="section-title">
-      <h3>รายการประจำรอบบิล</h3>
+      <h3>รายการประจำรอบบิล <span id="entryCountBadge" style="font-size:13px; font-weight:normal; color:var(--text-muted);">(0 รายการ)</span></h3>
       <div>
-        <span onclick="openPaymentHistoryModal()" style="background:var(--surface-white); padding:5px 12px; border-radius:10px; box-shadow:2px 2px 6px var(--shadow-dark); color:var(--primary-dark);">📜 ประวัติการชำระ</span>
-        <span id="cycleLabelText">รอบปัจจุบัน</span>
+        <span id="cycleLabelText" style="color:var(--text-muted); font-weight:500;">รอบปัจจุบัน</span>
       </div>
     </div>
     <div id="entriesList"><div style="text-align:center; padding: 30px; color: var(--text-muted);">กำลังโหลดข้อมูล... ⏳</div></div>
@@ -259,7 +259,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     <button class="btn-main" onclick="addEntry()" id="btnAddEntry">บันทึกรายการ</button>
   </div>
 
-  <!-- ================= BOTTOM NAVIGATION (Replaced Profile with History) ================= -->
+  <!-- ================= BOTTOM NAVIGATION ================= -->
   <nav class="bottom-nav">
     <div class="nav-item active" id="navHome" onclick="switchView('home')"><i>🏠</i><span>Home</span></div>
     <div class="nav-fab" onclick="switchView('add')">+</div>
@@ -267,7 +267,17 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.9.6 - Search, Sort, Group by Channel) -->
+<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.10.0) -->
+<div class="modal" id="entryDetailModal" onclick="if(event.target===this)closeEntryDetailModal()">
+  <div class="sheet" style="max-width: 600px;">
+    <div class="grabber"></div>
+    <h3 style="margin:0 0 12px; font-size:20px; text-align:center">📋 รายละเอียดค่าใช้จ่าย</h3>
+    <div id="entryDetailContent" style="max-height: 52vh; overflow-y: auto; padding-right:4px;"></div>
+    <button class="btn-main" style="margin-top:20px;" onclick="closeEntryDetailModal()">ปิดหน้าต่าง</button>
+  </div>
+</div>
+
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.10.0) -->
 <div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -300,7 +310,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     
     <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-size:13px; font-weight:600;">เลือกรายการที่ต้องการเคลียร์หนี้:</span>
+        <span style="font-size:13px; font-weight:600;" id="bulkSelectListLabel">เลือกรายการที่ต้องการเคลียร์หนี้ (0 รายการ):</span>
         <div>
           <button class="badge" style="cursor:pointer; background:var(--primary); color:#fff; border:none; padding:4px 8px;" onclick="toggleSelectAllBulk(true)">เลือกทั้งหมด</button>
           <button class="badge" style="cursor:pointer; background:var(--bg); color:var(--text-main); border:1px solid var(--shadow-dark); padding:4px 8px; margin-left:4px;" onclick="toggleSelectAllBulk(false)">ยกเลิกทั้งหมด</button>
@@ -469,18 +479,116 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 let entries = [];
 let userChangedCycle = false;
 let currentForcedPayer = null;
-let localSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.9.6")) || { 
-  budgets: {}, 
-  channels: { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } } 
+
+// ค่าตั้งต้นสำหรับทุกช่องทาง
+const defaultChannels = { 
+  "CreditCard": { cutoff: 17, due: 30, budget: 0 }, 
+  "SPayLater": { cutoff: 25, due: 5, budget: 0 }, 
+  "Lazada": { cutoff: 20, due: 20, budget: 0 }, 
+  "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, 
+  "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, 
+  "Other": { cutoff: 31, due: 31, budget: 0 } 
 };
 
-// --- PAYMENT HISTORY MODAL LOGIC (V2.9.6: Search, Sort, Group by Channel) ---
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.8"));
+let localSettings = savedSettings || { budgets: {}, channels: defaultChannels };
+// นำช่องทางพื้นฐานมารวมกับช่องทางที่เซฟไว้ ป้องกันช่องทางใหม่หายหรือตกหล่น
+localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
+
+// --- ENTRY DETAIL MODAL LOGIC (V2.10.0) ---
+function openEntryDetailModal(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+
+  let imgTag = e.image 
+    ? `<div style="text-align:center; margin-bottom:14px;"><img src="${e.image}" style="max-height:160px; border-radius:12px; object-fit:cover; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.1);" onclick="viewImage('${e.image}')"></div>` 
+    : '';
+
+  let splitInfo = "";
+  if (e.owner === "Nu & B" && e.splitDetails) {
+    splitInfo = `<div style="font-size:12px; color:var(--text-muted); margin-top:2px;">สัดส่วนหาร: Nu ${e.splitDetails.Nu}${e.splitDetails.mode === 'percent' ? '%' : '฿'} / B ${e.splitDetails.B}${e.splitDetails.mode === 'percent' ? '%' : '฿'}</div>`;
+  }
+
+  let html = `
+    ${imgTag}
+    <div style="background:var(--bg); border-radius:16px; padding:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); margin-bottom:14px;">
+      <div style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:8px;">${esc(e.item)}</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:13px; margin-bottom:8px;">
+        <div>📅 วันที่: <strong>${fmtDate(e.date)}</strong></div>
+        <div>👤 คนจ่าย: <strong>${esc(e.owner)}</strong></div>
+      </div>
+      ${splitInfo}
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:13px; margin-top:8px; border-top:1px dashed var(--shadow-dark); padding-top:8px;">
+        <div>💳 ช่องทาง: <strong>${esc(e.method)}</strong></div>
+        <div>🏷️ หมวดหมู่: <strong>${esc(e.category)}</strong></div>
+      </div>
+      ${e.orderNo ? `<div style="font-size:12.5px; margin-top:6px;">🛒 Order No: <strong>${esc(e.orderNo)}</strong></div>` : ''}
+      ${e.transactionNo ? `<div style="font-size:12.5px; margin-top:4px;">💳 Tx No: <strong>${esc(e.transactionNo)}</strong></div>` : ''}
+      ${e.note ? `<div style="font-size:12.5px; margin-top:6px; color:var(--text-muted);">📝 หมายเหตุ: ${esc(e.note)}</div>` : ''}
+    </div>`;
+
+  if (e.isInstallment && e.installmentPlan) {
+    let plan = e.installmentPlan;
+    let principal = Number(e.amount) || 0;
+    let totalToPay = Number(plan.totalToPay) || 0;
+    let totalInterest = totalToPay - principal;
+    if (totalInterest < 0) totalInterest = 0;
+    let annualInterest = Number(plan.annualInterest) || 0;
+    if (annualInterest === 0 && totalInterest > 0 && principal > 0 && plan.months > 0) {
+      annualInterest = (totalInterest / principal) * (12 / plan.months) * 100;
+    }
+
+    html += `
+      <div style="background:var(--surface-white); border-radius:16px; padding:14px; border:1px solid var(--shadow-dark); margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:600; color:var(--primary-dark); margin-bottom:10px;">📊 ข้อมูลการผ่อนชำระ (${plan.months} งวด)</div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+          <span>ยอดเงินต้น: <strong>฿${money(principal)}</strong></span>
+          <span>ยอดรวมดอกเบี้ย: <strong style="color:var(--danger)">฿${money(totalInterest)}</strong></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+          <span>ยอดรวมตลอดสัญญา: <strong>฿${money(totalToPay)}</strong></span>
+          <span>อัตราดอกเบี้ย: <strong>${annualInterest.toFixed(2)}% ต่อปี</strong></span>
+        </div>
+        <div style="font-size:12.5px; margin-top:6px; border-top:1px solid var(--shadow-light); padding-top:6px;">
+          ยอดผ่อนต่องวด: <strong style="color:var(--primary)">฿${money(plan.perMonth)} / เดือน</strong>
+        </div>
+      </div>
+      
+      <div style="font-size:13.5px; font-weight:600; margin-bottom:8px;">ตารางงวดผ่อนชำระ (${plan.schedules.length} งวด):</div>
+      <div style="max-height: 25vh; overflow-y: auto;">
+        <table class="report-table">
+          <tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th></tr>`;
+    
+    plan.schedules.forEach(s => {
+      let slipIcon = s.image ? `<span style="cursor:pointer; margin-left:4px;" onclick="viewImage('${s.image}')" title="ดูสลิป">📷</span>` : '';
+      html += `<tr><td><strong>${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary)">จ่ายแล้ว ✓</span>' + slipIcon : '<span style="color:var(--danger)">รอจ่าย</span>'}</td></tr>`;
+    });
+    html += `</table></div>`;
+  } else {
+    let repaid = getRepaidSum(e);
+    html += `
+      <div style="background:var(--surface-white); border-radius:16px; padding:14px; border:1px solid var(--shadow-dark);">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+          <span>ยอดซื้อสุทธิ: <strong>฿${money(e.amount)}</strong></span>
+          <span>ชำระคืนแล้ว: <strong style="color:var(--primary)">฿${money(repaid)}</strong></span>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById("entryDetailContent").innerHTML = html;
+  document.getElementById("entryDetailModal").classList.add("open");
+}
+
+function closeEntryDetailModal() {
+  document.getElementById("entryDetailModal").classList.remove("open");
+}
+
+// --- PAYMENT HISTORY MODAL LOGIC ---
 let cachedPaymentHistoryItems = [];
 
 function openPaymentHistoryModal() {
   const k = document.getElementById("cycleSelect").value;
   if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
-  document.getElementById("payHistCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
   
   const es = entries.filter(x => { 
     let m = x.method || "CreditCard"; 
@@ -539,7 +647,8 @@ function openPaymentHistoryModal() {
     }
   });
 
-  // Render Summary Box
+  document.getElementById("payHistCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)} (${cachedPaymentHistoryItems.length} รายการที่ชำระแล้ว)`;
+
   let summaryBoxHtml = "";
   if (cachedPaymentHistoryItems.length > 0) {
     let chips = Object.keys(payerSummary).map(p => `<div style="background:rgba(255,255,255,0.2); padding:5px 10px; border-radius:10px; font-size:11.5px; backdrop-filter:blur(4px);">👤 ${esc(p)}: <strong>฿${money(payerSummary[p])}</strong></div>`).join("");
@@ -562,7 +671,6 @@ function renderPaymentHistoryList() {
   const keyword = (document.getElementById("payHistSearch").value || "").toLowerCase();
   const sortType = document.getElementById("payHistSort").value;
 
-  // Filter items
   let filtered = cachedPaymentHistoryItems.filter(h => {
     let matchName = h.itemName.toLowerCase().includes(keyword);
     let matchPayer = (h.payer || "").toLowerCase().includes(keyword);
@@ -570,7 +678,6 @@ function renderPaymentHistoryList() {
     return matchName || matchPayer || matchMethod;
   });
 
-  // Sort items
   filtered.sort((a, b) => {
     if (sortType === 'dateDesc') return b.date.localeCompare(a.date);
     if (sortType === 'dateAsc') return a.date.localeCompare(b.date);
@@ -579,7 +686,6 @@ function renderPaymentHistoryList() {
     return 0;
   });
 
-  // Group by channel (method)
   let groups = {};
   filtered.forEach(h => {
     let m = h.method || "อื่นๆ";
@@ -598,7 +704,7 @@ function renderPaymentHistoryList() {
       html += `
         <div style="margin-bottom: 16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg); padding:8px 12px; border-radius:10px; margin-bottom:8px; box-shadow:inset 2px 2px 5px var(--shadow-dark);">
-            <strong style="font-size:13.5px; color:var(--primary-dark);">🏷️ ช่องทาง: ${esc(method)}</strong>
+            <strong style="font-size:13.5px; color:var(--primary-dark);">🏷️ ช่องทาง: ${esc(method)} (${items.length} รายการ)</strong>
             <span style="font-size:12px; font-weight:700; color:var(--text-main);">รวม ฿${money(channelTotal)}</span>
           </div>`;
 
@@ -656,7 +762,6 @@ async function cancelPaymentItem(entryId, type, idOrNo) {
     await db.collection("entries").doc(entryId).update({ repayments: updatedRepayments });
   }
 
-  // Refresh cache and re-open/re-render
   openPaymentHistoryModal();
   render();
   alert("✅ ยกเลิกการชำระและซิงค์ข้อมูลเรียบร้อยแล้ว!");
@@ -692,6 +797,8 @@ function openBulkRepayModal() {
         </div>`;
     }
   });
+
+  document.getElementById("bulkSelectListLabel").textContent = `เลือกรายการที่ต้องการเคลียร์หนี้ (${unpaidCount} รายการ):`;
 
   if(unpaidCount === 0) {
     html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค้างชำระในรอบบิลนี้ 🎉</div>`;
@@ -817,9 +924,11 @@ function openAnalyticsModal() {
   });
 
   let html = "";
-  if (Object.keys(catMap).length === 0) {
+  const catKeys = Object.keys(catMap);
+  if (catKeys.length === 0) {
     html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ยังไม่มีข้อมูลค่าใช้จ่ายในรอบบิลนี้</div>`;
   } else {
+    html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">พบหมวดหมู่การใช้จ่ายทั้งหมด (${catKeys.length} หมวดหมู่):</div>`;
     for (let cat in catMap) {
       let amt = catMap[cat];
       let pct = totalCycleSpent > 0 ? (amt / totalCycleSpent) * 100 : 0;
@@ -864,11 +973,11 @@ function openLineShareModal() {
 
   let text = `📢 สรุปยอดค่าใช้จ่ายรอบบิล (${cycleLabel(k)})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `💰 ยอดค้างรวมทั้งหมด: ฿${money(tR)}\n\n`;
+  text += `💰 ยอดค้างรวมทั้งหมด (${es.length} รายการ): ฿${money(tR)}\n\n`;
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.9.6`;
+  text += `✨ บันทึกผ่าน Credit Card & Loan Master Pro V2.10.0`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1098,7 +1207,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.9.6", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.10.0", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1128,7 +1237,18 @@ if(db) { db.collection("entries").orderBy("createdAt", "desc").onSnapshot((snaps
 function compressImage(file) { return new Promise((resolve) => { if(!file) return resolve(null); const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const MAX = 400; const scale = img.width > MAX ? (MAX / img.width) : 1; canvas.width = img.width * scale; canvas.height = img.height * scale; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.6)); } } }); }
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
-function getChannelCutoff(method) { let ch = localSettings.channels[method] || localSettings.channels["CreditCard"]; return Number(ch.cutoff) || 17; }
+
+// ฟังก์ชันดึงวันตัดรอบ (พร้อมระบบป้องกันค่าตกหล่น)
+function getChannelCutoff(method) { 
+  let ch = localSettings.channels[method]; 
+  if(!ch) {
+    if(defaultChannels[method]) return defaultChannels[method].cutoff;
+    if(method === "Cash/Transfer" || method === "ShopeePay" || method === "Other") return 31;
+    return 17;
+  }
+  return Number(ch.cutoff) || 17; 
+}
+
 function keyFromDateForMethod(dateStr, method) { const d = parseDate(dateStr); const c = getChannelCutoff(method); if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; let n = new Date(d.getFullYear(), d.getMonth()+1, 1); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
 function keyFromDate(s){ return keyFromDateForMethod(s, "CreditCard"); }
 
@@ -1464,7 +1584,8 @@ function openInstallmentModal(id) {
 }
 function closeInstModal() { document.getElementById("installmentModal").classList.remove("open"); currentInstEntryId = null; }
 function renderInstSchedules(schedules) { 
-  let html = `<table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; 
+  let html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:8px;">ตารางงวดทั้งหมด (${schedules.length} งวด):</div>`;
+  html += `<table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; 
   schedules.forEach(s => { 
     let slipIcon = s.image ? `<span style="cursor:pointer; margin-left:4px; font-size:14px;" onclick="viewImage('${s.image}')" title="ดูสลิป">📷</span>` : "";
     html += `<tr><td><strong>งวดที่ ${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary);">จ่ายแล้ว ✓</span>' + slipIcon : '<span style="color:var(--danger)">รอจ่าย</span>'}</td><td><button class="btn-main" style="padding:4px 8px; font-size:11px; border-radius:6px;" onclick="toggleInstPay(${s.no})">${s.paid ? 'ยกเลิก' : 'จ่ายงวดนี้'}</button></td></tr>`; 
@@ -1519,10 +1640,11 @@ function openMethodBreakdownModal() {
   } else { 
     allChannelsSet.forEach(method => { 
       let dat = breakdown[method] || { totalRemain: 0, totalSpent: 0, items: [] };
-      let chInfo = channels[method] || { cutoff: 17, due: 30, budget: 0 }; 
+      let chInfo = channels[method] || defaultChannels[method] || { cutoff: 17, due: 30, budget: 0 }; 
       let chBudget = Number(chInfo.budget) || 0;
       let percent = chBudget > 0 ? Math.min(100, (dat.totalSpent / chBudget) * 100) : 0; 
       let collapseId = `collapse-${method}`;
+      let itemCount = dat.items.length;
       
       let budgetInfoHtml = "";
       if (chBudget > 0) {
@@ -1542,7 +1664,7 @@ function openMethodBreakdownModal() {
         <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)} 🔽</strong>
+              <strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)} (${itemCount} รายการ) 🔽</strong>
               <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ตัดรอบวันที่ ${chInfo.cutoff} | กำหนดจ่ายวันที่ ${chInfo.due}</div>
             </div>
             <div style="text-align:right;">
@@ -1607,18 +1729,23 @@ function openPersonDetail(personName) {
   });
 
   let html = ""; 
+  let totalPersonItemsCount = 0;
+  Object.values(methodGroups).forEach(mg => totalPersonItemsCount += mg.items.length);
+
   if(Object.keys(methodGroups).length === 0) {
     html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่าย</div>`;
   } else { 
+    html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">รายการทั้งหมดของ ${personName} (${totalPersonItemsCount} รายการ):</div>`;
     for(let method in methodGroups) { 
       let dat = methodGroups[method];
       let collapseId = `person-collapse-${personName}-${method}`.replace(/\s+/g, '_');
+      let itemCount = dat.items.length;
 
       html += `
         <div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
-              <strong style="font-size:15px; color:var(--primary-dark)">💳 ช่องทาง: ${esc(method)} 🔽</strong>
+              <strong style="font-size:15px; color:var(--primary-dark)">💳 ช่องทาง: ${esc(method)} (${itemCount} รายการ) 🔽</strong>
               <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ยอดรวมส่วนนี้: ฿${money(dat.totalSpent)}</div>
             </div>
             <div style="text-align:right;">
@@ -1666,6 +1793,9 @@ function render(){
   checkDueAlerts(k);
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
   
+  // อัปเดตจำนวนรายการกำกับไว้ที่หัวข้อหน้าหลัก
+  document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
+
   let tR = 0; 
   let pD = {
     "Nu": { s: 0, p: 0, rm: 0 },
@@ -1715,19 +1845,19 @@ function render(){
       const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; 
       const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
       let instBadge = ""; let m = x.method || "CreditCard";
-      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
-      else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
+      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="event.stopPropagation(); openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
+      else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="event.stopPropagation(); openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
       
-      let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
+      let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="event.stopPropagation(); openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
 
-      return `<div class="entry-card" id="card-${x.id}">
-                <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="viewImage('${x.image}')"` : ''}>${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}</div>
+      return `<div class="entry-card" id="card-${x.id}" onclick="openEntryDetailModal('${x.id}')">
+                <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="event.stopPropagation(); viewImage('${x.image}')"` : ''}>${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}</div>
                 <div class="entry-details">
                   <h4>${esc(x.item)}</h4>
                   <p>${fmtDate(x.date)} • ${changeOwnerBtn}</p>
                   <div class="entry-meta"><span class="badge">${esc(x.method)}</span> ${orderH} ${txH} ${instBadge}</div>
                 </div>
-                <div class="entry-right">
+                <div class="entry-right" onclick="event.stopPropagation()">
                   <button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button>
                   <h4>฿${money(eff.amount)}</h4>
                   ${eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`}
@@ -1741,12 +1871,10 @@ function render(){
   document.getElementById("entriesList").innerHTML = entriesHtml;
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
-  // อัปเดตข้อมูลมินิแอปกระเป๋าเงินคู่รัก
   document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent);
   document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum);
   document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
 
-  // เรนเดอร์ยอดหนี้รายบุคคล
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
   document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
     let dat = pD[p] || { rm: 0 }; 
@@ -1837,7 +1965,8 @@ function filterVisualReport() {
     return matchKw && matchCat && matchMethod;
   }).sort((a,b)=>a.sortDate.localeCompare(b.sortDate));
 
-  let html = `<table class="report-table"><tr><th>วันที่</th><th>รายการ</th><th>ช่องทาง</th><th>หมวดหมู่</th><th>ยอด (฿)</th><th>ผู้จ่าย</th></tr>`;
+  let html = `<div style="font-size:12px; color:var(--text-muted); margin-bottom:8px; font-weight:600;">ผลลัพธ์การแสดงผล (${filtered.length} รายการ):</div>`;
+  html += `<table class="report-table"><tr><th>วันที่</th><th>รายการ</th><th>ช่องทาง</th><th>หมวดหมู่</th><th>ยอด (฿)</th><th>ผู้จ่าย</th></tr>`;
   if (filtered.length === 0) {
     html += `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--text-muted);">ไม่พบรายการตามเงื่อนไข</td></tr>`;
   } else {
@@ -1944,13 +2073,13 @@ function openSettings(){
   const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
   
   channelNames.forEach(ch => { 
-    let dat = channels[ch] || { cutoff: 17, due: 30, budget: 0 }; 
+    let dat = channels[ch] || defaultChannels[ch] || { cutoff: 17, due: 30, budget: 0 }; 
     let safeId = ch.replace('/', '_');
     html += `
       <div style="background:var(--bg); padding:14px; border-radius:14px; margin-bottom:14px;">
         <strong>🏷️ ${ch}</strong>
         <div style="display:flex; gap:10px; margin-top:8px;">
-          <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${safeId}" value="${dat.cutoff}" min="1" max="28"></div>
+          <div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${safeId}" value="${dat.cutoff}" min="1" max="31"></div>
           <div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${safeId}" value="${dat.due}" min="1" max="31"></div>
         </div>
         <div style="margin-top:10px;">
@@ -1971,8 +2100,8 @@ function saveSettings(){
   ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { 
     let safeId = ch.replace('/', '_');
     newChannels[ch] = { 
-      cutoff: Number(document.getElementById(`cutoff-${safeId}`).value)||17, 
-      due: Number(document.getElementById(`due-${safeId}`).value)||30,
+      cutoff: Number(document.getElementById(`cutoff-${safeId}`).value)||31, 
+      due: Number(document.getElementById(`due-${safeId}`).value)||31,
       budget: Number(document.getElementById(`budget-${safeId}`).value)||0
     }; 
   });
