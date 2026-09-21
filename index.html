@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Expense Master Pro V2.11.0</title>
+<title>Credit Card & Expense Master Pro V2.12.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -92,7 +92,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Expense Master V2.11.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.12.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -123,7 +123,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
     </div>
 
-    <!-- มินิแอปกระเป๋าเงินคู่รัก (Shared Wallet) -->
+    <!-- มินิแอปกระเป๋าเงินคู่รัก (Shared Wallet) - ปรับปรุงใหม่ตามคำสั่ง -->
     <div style="background: var(--surface-white); border-radius: 22px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="margin: 0; font-size: 16px; color: var(--text-main);">👥 กระเป๋าเงินคู่รัก (Shared Wallet)</h3>
@@ -132,6 +132,18 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <div style="background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 18px; padding: 16px; color: #fff; margin-bottom: 12px;">
         <p style="margin: 0; font-size: 12px; opacity: 0.9;">ยอดใช้จ่ายร่วมกัน (Nu & B) รอบนี้</p>
         <h2 id="sharedTotalSpent" style="margin: 4px 0 10px; font-size: 24px; font-weight: 700;">฿0.00</h2>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+          <div style="background: rgba(0,0,0,0.1); padding: 8px 10px; border-radius: 10px; font-size: 12px; text-align: center;">
+            <span>Nu ใช้ไป</span>
+            <strong id="nuSpentSum" style="display: block; font-size: 13px; margin-top: 2px;">฿0.00</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.1); padding: 8px 10px; border-radius: 10px; font-size: 12px; text-align: center;">
+            <span>B ใช้ไป</span>
+            <strong id="bSpentSum" style="display: block; font-size: 13px; margin-top: 2px;">฿0.00</strong>
+          </div>
+        </div>
+
         <div style="display: flex; gap: 8px; background: rgba(0,0,0,0.1); padding: 8px 10px; border-radius: 12px; font-size: 12px;">
           <div style="flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.2);">
             <span>Nu จ่ายไป</span>
@@ -267,7 +279,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก (Entry Detail Modal V2.11.0) -->
+<!-- Modal แสดงรายละเอียดบิลแบบเจาะลึก -->
 <div class="modal" id="entryDetailModal" onclick="if(event.target===this)closeEntryDetailModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -277,7 +289,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modal ประวัติการชำระเงินประจำรอบบิล (Payment History Modal V2.11.0) -->
+<!-- Modal ประวัติการชำระเงินประจำรอบบิล -->
 <div class="modal" id="paymentHistoryModal" onclick="if(event.target===this)closePaymentHistoryModal()">
   <div class="sheet" style="max-width: 600px;">
     <div class="grabber"></div>
@@ -362,7 +374,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </div>
 </div>
 
-<!-- Modals อื่นๆ เดิม -->
+<!-- Modals อื่นๆ -->
 <div class="modal" id="methodBreakdownModal" onclick="if(event.target===this)closeMethodBreakdownModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center">💳 สรุปยอดหนี้แยกตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="methodModalCycleLabel"></div><div style="max-height: 45vh; overflow-y: auto; padding-right:4px;" id="methodBreakdownContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeMethodBreakdownModal()">ปิดหน้าต่าง</button></div></div>
 
 <div class="modal" id="analyticsModal" onclick="if(event.target===this)closeAnalyticsModal()">
@@ -490,11 +502,11 @@ const defaultChannels = {
   "Other": { cutoff: 31, due: 31, budget: 0 } 
 };
 
-let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9"));
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.12.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0"));
 let localSettings = savedSettings || { budgets: {}, channels: defaultChannels };
 localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
 
-// --- ENTRY DETAIL MODAL LOGIC (V2.11.0) ---
+// --- ENTRY DETAIL MODAL LOGIC ---
 function openEntryDetailModal(id) {
   const e = entries.find(x => x.id === id);
   if (!e) return;
@@ -976,7 +988,7 @@ function openLineShareModal() {
   text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n`;
   text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n`;
   text += `━━━━━━━━━━━━━━━\n`;
-  text += `✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
+  text += `✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.12.0`;
 
   document.getElementById("lineShareTextOutput").value = text;
   document.getElementById("lineShareModal").classList.add("open");
@@ -1077,7 +1089,7 @@ function onSplitInput(changed) {
     if (changed === 'Nu') {
       bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     } else {
-      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2);
+      nuInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
     }
   }
 }
@@ -1168,6 +1180,11 @@ async function addEntry(){
     
     let entryData = { date, item, amount, owner, splitDetails, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [], isInstallment: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
 
+    // ถ้ารายการเป็นประเภท cash (เงินสด/โอน/ShopeePay/อื่นๆ) ให้ถือว่าชำระแล้วทันที (repayments เต็มจำนวน)
+    if (getChannelType(method) === 'cash' && !isInst) {
+      entryData.repayments = [{ id: Date.now().toString(), date, amount, payer: owner === "Nu & B" ? "Nu and B" : owner, image: b64Img }];
+    }
+
     if (isInst) {
       const months = Number(document.getElementById("addMonths").value) || 5; 
       const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; 
@@ -1206,7 +1223,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.11.0", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.12.0", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -1237,8 +1254,7 @@ function compressImage(file) { return new Promise((resolve) => { if(!file) retur
 function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
 function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
 
-// --- Dual-Engine Architecture (V2.11.0) ---
-// แยกประเภทช่องทาง: เงินสด/โอน/กระเป๋าเงิน (cash) คิดตามเดือนปฏิทิน | บัตรเครดิต/สินเชื่อ (credit) คิดตามรอบบิลตัดรอบ
+// --- Dual-Engine Architecture ---
 function getChannelType(method) {
   if (["Cash/Transfer", "ShopeePay", "Other"].includes(method)) return 'cash';
   return 'credit';
@@ -1257,10 +1273,8 @@ function getChannelCutoff(method) {
 function keyFromDateForMethod(dateStr, method) { 
   const d = parseDate(dateStr); 
   if (getChannelType(method) === 'cash') {
-    // เงินสด/โอน คิดตามเดือนปฏิทินจริง (YYYY-MM)
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
   } else {
-    // บัตรเครดิต/สินเชื่อ คิดตามวันตัดรอบบิล
     const c = getChannelCutoff(method); 
     if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; 
     let n = new Date(d.getFullYear(), d.getMonth()+1, 1); 
@@ -1270,14 +1284,12 @@ function keyFromDateForMethod(dateStr, method) {
 
 function keyFromDate(s){ return keyFromDateForMethod(s, "CreditCard"); }
 
+// ปรับปรุงชื่อรอบ/เดือน ให้แสดงแค่ชื่อเดือนและปี พ.ศ. ตามคำสั่ง
 function cycleLabel(k){ 
   let [y,m] = k.split("-").map(Number); 
-  let c = getChannelCutoff("CreditCard"); 
-  let end = new Date(y, m-1, c); 
-  let start = new Date(y, m-2, c + 1); 
   const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
   let monthName = thaiMonths[m-1];
-  return `${monthName} ${y+543} (บิลบัตร: ${pad(start.getDate())}/${pad(start.getMonth()+1)} - ${pad(end.getDate())}/${pad(end.getMonth()+1)})`; 
+  return `${monthName} ${y+543}`; 
 }
 
 function allKeys(){ 
@@ -1345,13 +1357,19 @@ let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
 function getEffectiveItemData(e, selectedCycleKey) {
   let m = e.method || "CreditCard";
+  let isCash = getChannelType(m) === 'cash';
+  
   if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
     let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
     let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
     let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
-    let effectiveRemain = effectiveAmount - paidSchedulesSum;
-    return { amount: effectiveAmount, repaid: paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
-  } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
+    let effectiveRemain = isCash ? 0 : (effectiveAmount - paidSchedulesSum);
+    return { amount: effectiveAmount, repaid: isCash ? effectiveAmount : paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
+  } else { 
+    let r = getRepaidSum(e); 
+    let rm = isCash ? 0 : (e.amount - r); 
+    return { amount: e.amount, repaid: isCash ? e.amount : r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; 
+  }
 }
 
 function getShareForPerson(x, totalAmt, personName) {
@@ -1393,7 +1411,7 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
   }
 
   personKeys.forEach(p => {
-    let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
+    let directForP = repayments.filter(r => r.payer === p || r.payer === "Nu and B").reduce((sum, r) => sum + r.amount, 0);
     let allocatedToP = Math.min(shares[p], directForP);
     result[p].paid += allocatedToP;
     result[p].remain = Math.max(0, shares[p] - result[p].paid);
@@ -1411,22 +1429,6 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
       });
     }
   }
-
-  personKeys.forEach(p => {
-    let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0);
-    let excess = directForP - shares[p];
-    if (excess > 0) {
-      let otherPersons = personKeys.filter(other => other !== p && result[other].remain > 0);
-      let totalOtherRemain = otherPersons.reduce((sum, other) => sum + result[other].remain, 0);
-      if (totalOtherRemain > 0) {
-        otherPersons.forEach(other => {
-          let cover = Math.min(result[other].remain, excess * (result[other].remain / totalOtherRemain));
-          result[other].paid += cover;
-          result[other].remain = Math.max(0, shares[other] - result[other].paid);
-        });
-      }
-    }
-  });
 
   personKeys.forEach(p => {
     result[p].paid = Math.min(shares[p], result[p].paid);
@@ -1453,8 +1455,8 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); });
       
       let scheduleRepayments = [];
-      if (s.paid) {
-        scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || "", image: s.image });
+      if (s.paid || getChannelType(m) === 'cash') {
+        scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || x.owner || "", image: s.image });
       }
 
       let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
@@ -1470,7 +1472,12 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       let shares = {};
       owners.forEach(o => { shares[o] = getShareForPerson(x, totalAmt, o); });
 
-      let breakdown = calculateShareBreakdown(totalAmt, shares, x.repayments || []);
+      let reps = x.repayments || [];
+      if (getChannelType(m) === 'cash' && reps.length === 0) {
+        reps = [{ amount: totalAmt, payer: x.owner }];
+      }
+
+      let breakdown = calculateShareBreakdown(totalAmt, shares, reps);
       totalSpent += breakdown[personName].spent;
       totalPaid += breakdown[personName].paid;
       totalRemain += breakdown[personName].remain;
@@ -1842,6 +1849,8 @@ function render(){
   }; 
 
   let sharedSpent = 0;
+  let nuSpentSum = 0;
+  let bSpentSum = 0;
   let nuPaidSum = 0;
   let bPaidSum = 0;
 
@@ -1855,19 +1864,30 @@ function render(){
       
       if (x.owner === "Nu & B" || x.owner === "Nu and B") {
         sharedSpent += eff.amount;
+        nuSpentSum += eff.amount / 2;
+        bSpentSum += eff.amount / 2;
         if (x.repayments) {
           x.repayments.forEach(r => {
-            if (r.payer === "Nu") nuPaidSum += r.amount;
-            if (r.payer === "B") bPaidSum += r.amount;
+            if (r.payer === "Nu" || r.payer === "Nu and B") nuPaidSum += r.amount;
+            if (r.payer === "B" || r.payer === "Nu and B") bPaidSum += r.amount;
           });
         }
         if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
           let m = x.method || "CreditCard";
           x.installmentPlan.schedules.forEach(s => {
             if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
-              if (s.payer === "Nu") nuPaidSum += s.amount;
-              if (s.payer === "B") bPaidSum += s.amount;
+              if (s.payer === "Nu" || s.payer === "Nu and B") nuPaidSum += s.amount;
+              if (s.payer === "B" || s.payer === "Nu and B") bPaidSum += s.amount;
             }
+          });
+        }
+      } else {
+        if (x.owner === "Nu") nuSpentSum += eff.amount;
+        if (x.owner === "B") bSpentSum += eff.amount;
+        if (x.repayments) {
+          x.repayments.forEach(r => {
+            if (r.payer === "Nu" && x.owner === "Nu") nuPaidSum += r.amount;
+            if (r.payer === "B" && x.owner === "B") bPaidSum += r.amount;
           });
         }
       }
@@ -1911,6 +1931,8 @@ function render(){
   document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
 
   document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent);
+  document.getElementById("nuSpentSum").textContent = "฿" + money(nuSpentSum);
+  document.getElementById("bSpentSum").textContent = "฿" + money(bSpentSum);
   document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum);
   document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
 
