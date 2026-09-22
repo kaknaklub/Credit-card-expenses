@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Expense Master Pro V2.11.0</title>
+<title>Credit Card & Expense Master Pro V2.12.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -19,7 +19,7 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .btn-icon { width: 42px; height: 42px; border-radius: 14px; background: var(--bg); border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; box-shadow: 4px 4px 10px var(--shadow-dark), -4px -4px 10px var(--shadow-light); display: flex; align-items: center; justify-content: center; transition: 0.2s; }
 .balance-card { background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 28px; padding: 22px; color: #fff; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(126, 168, 138, 0.35); position: relative; overflow: hidden; }
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
-.balance-card h2 { margin: 4px 0 14px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
+.balance-card h2 { margin: 4px 0 10px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
 
 /* Badge รายบุคคล */
 .split-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -88,14 +88,15 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Expense Master V2.11.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.12.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
     <div class="balance-card">
-      <p>ยอดการใช้สินเชื่อ (ต้องชำระรอบนี้ / คงค้างทั้งหมด)</p>
-      <h2 id="sumOutstanding">฿0.00</h2>
-      <div id="sumTotalActiveDebt" style="font-size: 12.5px; opacity: 0.95; margin-top: -8px; margin-bottom: 12px;">ยอดหนี้คงค้างสะสมทั้งหมด: ฿0.00</div>
+      <p>ยอดเรียกเก็บแล้ว รอเคลียร์บิล (Billed & Due)</p>
+      <h2 id="sumBilledDue">฿0.00</h2>
+      <div id="sumUnbilled" style="font-size: 12.5px; opacity: 0.95; margin-top: -6px; margin-bottom: 4px;">ยอดรูดสะสม รอตัดรอบหน้า (Unbilled): ฿0.00</div>
+      <div id="sumTotalActiveDebt" style="font-size: 11.5px; opacity: 0.85; margin-bottom: 12px;">ยอดหนี้คงค้างสะสมทั้งหมด: ฿0.00</div>
       
       <!-- ส่วนแสดงยอดหนี้รายบุคคล -->
       <div class="split-badges" id="personSummary"></div>
@@ -273,7 +274,7 @@ try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch
 
 let entries = []; let userChangedCycle = false; let currentForcedPayer = null;
 const defaultChannels = { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } };
-let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0"));
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.12.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0"));
 let localSettings = savedSettings || { channels: defaultChannels };
 localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
 
@@ -410,7 +411,7 @@ function openLineShareModal() {
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; });
   let tR = 0; let pSpent = { "Nu": 0, "B": 0 }; let pRemain = { "Nu": 0, "B": 0 };
   es.forEach(x => { const eff = getEffectiveItemData(x, k); tR += eff.remain; ["Nu", "B"].forEach(p => { let b = getPersonItemBreakdown(x, k, p); pSpent[p] += b.spent; pRemain[p] += b.remain; }); });
-  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
+  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.12.0`;
   document.getElementById("lineShareTextOutput").value = text; document.getElementById("lineShareModal").classList.add("open");
 }
 function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
@@ -491,7 +492,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.11.0", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.12.0", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(n * 100) / 100); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -744,6 +745,26 @@ function openPersonDetail(personName) {
 }
 function closePersonModal() { document.getElementById("personModal").classList.remove("open"); }
 
+// ฟังก์ชันเช็กว่ารายการนี้ผ่านวันตัดรอบ (Cut-off) หรือยัง (ณ วันปัจจุบัน)
+function isItemBilledAndDueToday(itemDateStr, method) {
+  let d = parseDate(itemDateStr);
+  let cutoffDay = getChannelCutoff(method);
+  let today = new Date();
+  
+  // สร้างวันที่ตัดรอบของเดือนที่ทำรายการ
+  let cutoffDateThisMonth = new Date(d.getFullYear(), d.getMonth(), cutoffDay);
+  
+  // ถ้ารายการเกิดขึ้นหลังวันตัดรอบของเดือนนั้น แปลว่ามันจะไปตัดรอบในเดือนถัดไป (ยังไม่ออกบิล)
+  if (d.getTime() > cutoffDateThisMonth.getTime()) {
+    // ถ้ารายการอยู่หลังวันตัดรอบเดือนนี้ เช็กว่าวันนี้ข้ามวันตัดรอบของเดือนถัดไปหรือยัง
+    let cutoffDateNextMonth = new Date(d.getFullYear(), d.getMonth() + 1, cutoffDay);
+    return today.getTime() >= cutoffDateNextMonth.getTime();
+  } else {
+    // ถ้ารายการเกิดขึ้นก่อนหรือตรงกับวันตัดรอบเดือนนี้ เช็กว่าวันนี้ข้ามวันตัดรอบของเดือนนี้หรือยัง
+    return today.getTime() >= cutoffDateThisMonth.getTime();
+  }
+}
+
 function render(){
   if(document.getElementById("cycleSelect").options.length === 0) refreshCycles(); const k = document.getElementById("cycleSelect").value;
   if(document.getElementById("cycleSelect").options.length > 0) document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
@@ -752,23 +773,44 @@ function render(){
   
   document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
 
-  let tR = 0; let totalActiveDebt = 0; let pD = { "Nu": { s: 0, p: 0, rm: 0 }, "B": { s: 0, p: 0, rm: 0 } }; 
+  let totalBilledDue = 0; let totalUnbilled = 0; let totalActiveDebt = 0; 
+  let pD = { "Nu": { s: 0, p: 0, rm: 0 }, "B": { s: 0, p: 0, rm: 0 } }; 
   let sharedSpent = 0; let nuPaidSum = 0; let bPaidSum = 0; let entriesHtml = "";
 
-  // คำนวณยอดหนี้คงค้างทั้งหมดทุกรอบบิล
+  // คำนวณยอดหนี้คงค้างทั้งหมด, Billed & Due, และ Unbilled แบบ Real-time ปัจจุบัน
   entries.forEach(x => {
     let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return;
+    
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      x.installmentPlan.schedules.forEach(s => { if (!s.paid) totalActiveDebt += s.amount; });
+      x.installmentPlan.schedules.forEach(s => {
+        if (!s.paid) {
+          totalActiveDebt += s.amount;
+          // สำหรับผ่อนชำระ ถ้างวดนี้ถึงหรือเลยวันกำหนดชำระ/ตัดรอบ ถือเป็น Billed แล้ว
+          let today = new Date();
+          let sDate = parseDate(s.dueDate);
+          if (today.getTime() >= sDate.getTime()) {
+            totalBilledDue += s.amount;
+          } else {
+            totalUnbilled += s.amount;
+          }
+        }
+      });
     } else {
       let eff = getEffectiveItemData(x, keyFromDateForMethod(x.date, m));
-      totalActiveDebt += eff.remain;
+      if (eff.remain > 0) {
+        totalActiveDebt += eff.remain;
+        if (isItemBilledAndDueToday(x.date, m)) {
+          totalBilledDue += eff.remain;
+        } else {
+          totalUnbilled += eff.remain;
+        }
+      }
     }
   });
 
   if (es.length > 0) {
     entriesHtml = es.map(x => {
-      const eff = getEffectiveItemData(x, k); tR += eff.remain;
+      const eff = getEffectiveItemData(x, k);
       let m = x.method || "CreditCard"; let isCashType = getChannelType(m) === 'cash';
       let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
       
@@ -816,7 +858,8 @@ function render(){
   } else { entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`; }
 
   document.getElementById("entriesList").innerHTML = entriesHtml; 
-  document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+  document.getElementById("sumBilledDue").textContent = "฿" + money(totalBilledDue);
+  document.getElementById("sumUnbilled").textContent = "ยอดรูดสะสม รอตัดรอบหน้า (Unbilled): ฿" + money(totalUnbilled);
   document.getElementById("sumTotalActiveDebt").textContent = "ยอดหนี้คงค้างสะสมทั้งหมด: ฿" + money(totalActiveDebt);
 
   document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent); document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum); document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
