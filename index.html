@@ -7,7 +7,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
-<style>
+<style> 
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 :root { --bg: #f2f6f4; --surface-white: #ffffff; --primary: #7ea88a; --primary-light: #9bc2a6; --primary-dark: #5e8469; --text-main: #233128; --text-muted: #7a9082; --danger: #e26d6d; --shadow-light: #ffffff; --shadow-dark: #d5e2da; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Prompt', sans-serif; user-select: none; }
@@ -1257,10 +1257,8 @@ function getChannelCutoff(method) {
 function keyFromDateForMethod(dateStr, method) { 
   const d = parseDate(dateStr); 
   if (getChannelType(method) === 'cash') {
-    // เงินสด/โอน คิดตามเดือนปฏิทินจริง (YYYY-MM)
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
   } else {
-    // บัตรเครดิต/สินเชื่อ คิดตามวันตัดรอบบิล
     const c = getChannelCutoff(method); 
     if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; 
     let n = new Date(d.getFullYear(), d.getMonth()+1, 1); 
@@ -1343,15 +1341,26 @@ async function confirmConvertToInstallment() { const id = document.getElementByI
 
 let curRepayId = null;
 function getRepaidSum(e) { return e.repayments ? e.repayments.reduce((s, r) => s + r.amount, 0) : 0; }
+
+// Core Data Function (เคลียร์เงินสดออกจากการเป็นหนี้ 100%)
 function getEffectiveItemData(e, selectedCycleKey) {
   let m = e.method || "CreditCard";
+  let isCash = getChannelType(m) === 'cash';
+
   if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
     let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
     let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
     let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
+    
+    if (isCash) paidSchedulesSum = effectiveAmount; 
+    
     let effectiveRemain = effectiveAmount - paidSchedulesSum;
     return { amount: effectiveAmount, repaid: paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
-  } else { let r = getRepaidSum(e); let rm = e.amount - r; return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; }
+  } else { 
+    let r = isCash ? e.amount : getRepaidSum(e); 
+    let rm = e.amount - r; 
+    return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; 
+  }
 }
 
 function getShareForPerson(x, totalAmt, personName) {
@@ -1438,6 +1447,7 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
 
 function getPersonItemBreakdown(x, selectedCycleKey, personName) {
   let m = x.method || "CreditCard";
+  let isCash = getChannelType(m) === 'cash';
   let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
   if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
 
@@ -1453,8 +1463,8 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); });
       
       let scheduleRepayments = [];
-      if (s.paid) {
-        scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || "", image: s.image });
+      if (s.paid || isCash) {
+        scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || x.owner, image: s.image });
       }
 
       let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
@@ -1470,7 +1480,12 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
       let shares = {};
       owners.forEach(o => { shares[o] = getShareForPerson(x, totalAmt, o); });
 
-      let breakdown = calculateShareBreakdown(totalAmt, shares, x.repayments || []);
+      let reps = x.repayments || [];
+      if (isCash) {
+        reps = [{ amount: totalAmt, payer: x.owner }];
+      }
+
+      let breakdown = calculateShareBreakdown(totalAmt, shares, reps);
       totalSpent += breakdown[personName].spent;
       totalPaid += breakdown[personName].paid;
       totalRemain += breakdown[personName].remain;
@@ -2162,4 +2177,3 @@ setup();
 </script>
 </body>
 </html>
-
