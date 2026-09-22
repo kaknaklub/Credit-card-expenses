@@ -908,6 +908,1034 @@ async function toggleInstPay(no) { const e = entries.find(x => x.id === currentI
 function openBudgetModal() { const k = document.getElementById("cycleSelect").value; document.getElementById("budgetInputAmt").value = localSettings.budgets[k] || ''; document.getElementById("budgetModal").classList.add("open"); }
 function closeBudgetModal() { document.getElementById("budgetModal").classList.remove("open"); }
 function saveBudgetGoal() { const k = document.getElementById("cycleSelect").value; localSettings.budgets[k] = Number(document.getElementById("budgetInputAmt").value) || 0; saveSettingsLocal(); closeBudgetModal(); render(); }
+<script>
+// --- Firebase Config ---
+const firebaseConfig = { apiKey: "AIzaSyDm85vVJ5KBwHImC6hVCSzjo7DUFmoMnug", authDomain: "credit-card-expenses-e37d1.firebaseapp.com", projectId: "credit-card-expenses-e37d1", storageBucket: "credit-card-expenses-e37d1.firebasestorage.app", messagingSenderId: "1001964023206", appId: "1:1001964023206:web:c523fc5cebe855d73bf367", measurementId: "G-LQG2FTGPRC" };
+let db;
+try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (err) {}
+
+let entries = [];
+let userChangedCycle = false;
+let currentForcedPayer = null;
+
+// ค่าตั้งต้นสำหรับทุกช่องทาง
+const defaultChannels = { 
+  "CreditCard": { cutoff: 17, due: 30, budget: 0 }, 
+  "SPayLater": { cutoff: 25, due: 5, budget: 0 }, 
+  "Lazada": { cutoff: 20, due: 20, budget: 0 }, 
+  "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, 
+  "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, 
+  "Other": { cutoff: 31, due: 31, budget: 0 } 
+};
+
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9"));
+let localSettings = savedSettings || { budgets: {}, channels: defaultChannels };
+localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
+
+// --- ENTRY DETAIL MODAL LOGIC (V2.11.0) ---
+function openEntryDetailModal(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+
+  let imgTag = e.image 
+    ? `<div style="text-align:center; margin-bottom:14px;"><img src="${e.image}" style="max-height:160px; border-radius:12px; object-fit:cover; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,0.1);" onclick="viewImage('${e.image}')"></div>` 
+    : '';
+
+  let splitInfo = "";
+  if (e.owner === "Nu & B" && e.splitDetails) {
+    splitInfo = `<div style="font-size:12px; color:var(--text-muted); margin-top:2px;">สัดส่วนหาร: Nu ${e.splitDetails.Nu}${e.splitDetails.mode === 'percent' ? '%' : '฿'} / B ${e.splitDetails.B}${e.splitDetails.mode === 'percent' ? '%' : '฿'}</div>`;
+  }
+
+  let html = `
+    ${imgTag}
+    <div style="background:var(--bg); border-radius:16px; padding:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); margin-bottom:14px;">
+      <div style="font-size:16px; font-weight:700; color:var(--text-main); margin-bottom:8px;">${esc(e.item)}</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:13px; margin-bottom:8px;">
+        <div>📅 วันที่: <strong>${fmtDate(e.date)}</strong></div>
+        <div>👤 คนจ่าย: <strong>${esc(e.owner)}</strong></div>
+      </div>
+      ${splitInfo}
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:13px; margin-top:8px; border-top:1px dashed var(--shadow-dark); padding-top:8px;">
+        <div>💳 ช่องทาง: <strong>${esc(e.method)}</strong></div>
+        <div>🏷️ หมวดหมู่: <strong>${esc(e.category)}</strong></div>
+      </div>
+      ${e.orderNo ? `<div style="font-size:12.5px; margin-top:6px;">🛒 Order No: <strong>${esc(e.orderNo)}</strong></div>` : ''}
+      ${e.transactionNo ? `<div style="font-size:12.5px; margin-top:4px;">💳 Tx No: <strong>${esc(e.transactionNo)}</strong></div>` : ''}
+      ${e.note ? `<div style="font-size:12.5px; margin-top:6px; color:var(--text-muted);">📝 หมายเหตุ: ${esc(e.note)}</div>` : ''}
+    </div>`;
+
+  if (e.isInstallment && e.installmentPlan) {
+    let plan = e.installmentPlan;
+    let principal = Number(e.amount) || 0;
+    let totalToPay = Number(plan.totalToPay) || 0;
+    let totalInterest = totalToPay - principal;
+    if (totalInterest < 0) totalInterest = 0;
+    let annualInterest = Number(plan.annualInterest) || 0;
+    if (annualInterest === 0 && totalInterest > 0 && principal > 0 && plan.months > 0) {
+      annualInterest = (totalInterest / principal) * (12 / plan.months) * 100;
+    }
+
+    html += `
+      <div style="background:var(--surface-white); border-radius:16px; padding:14px; border:1px solid var(--shadow-dark); margin-bottom:14px;">
+        <div style="font-size:14px; font-weight:600; color:var(--primary-dark); margin-bottom:10px;">📊 ข้อมูลการผ่อนชำระ (${plan.months} งวด)</div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+          <span>ยอดเงินต้น: <strong>฿${money(principal)}</strong></span>
+          <span>ยอดรวมดอกเบี้ย: <strong style="color:var(--danger)">฿${money(totalInterest)}</strong></span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:6px;">
+          <span>ยอดรวมตลอดสัญญา: <strong>฿${money(totalToPay)}</strong></span>
+          <span>อัตราดอกเบี้ย: <strong>${annualInterest.toFixed(2)}% ต่อปี</strong></span>
+        </div>
+        <div style="font-size:12.5px; margin-top:6px; border-top:1px solid var(--shadow-light); padding-top:6px;">
+          ยอดผ่อนต่องวด: <strong style="color:var(--primary)">฿${money(plan.perMonth)} / เดือน</strong>
+        </div>
+      </div>
+      
+      <div style="font-size:13.5px; font-weight:600; margin-bottom:8px;">ตารางงวดผ่อนชำระ (${plan.schedules.length} งวด):</div>
+      <div style="max-height: 25vh; overflow-y: auto;">
+        <table class="report-table">
+          <tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th></tr>`;
+    
+    plan.schedules.forEach(s => {
+      let slipIcon = s.image ? `<span style="cursor:pointer; margin-left:4px;" onclick="viewImage('${s.image}')" title="ดูสลิป">📷</span>` : '';
+      html += `<tr><td><strong>${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary)">จ่ายแล้ว ✓</span>' + slipIcon : '<span style="color:var(--danger)">รอจ่าย</span>'}</td></tr>`;
+    });
+    html += `</table></div>`;
+  } else {
+    let repaid = getRepaidSum(e);
+    let isCash = getChannelType(e.method || "CreditCard") === 'cash';
+    if(isCash) repaid = e.amount; // ถ้าเป็นเงินสดโชว์ว่าจ่ายครบเสมอ
+    
+    html += `
+      <div style="background:var(--surface-white); border-radius:16px; padding:14px; border:1px solid var(--shadow-dark);">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+          <span>ยอดซื้อสุทธิ: <strong>฿${money(e.amount)}</strong></span>
+          <span>${isCash ? 'รายการเงินสด: ' : 'ชำระคืนแล้ว: '} <strong style="color:var(--primary)">${isCash ? 'ไม่ต้องเคลียร์หนี้ ✓' : '฿' + money(repaid)}</strong></span>
+        </div>
+      </div>`;
+  }
+
+  document.getElementById("entryDetailContent").innerHTML = html;
+  document.getElementById("entryDetailModal").classList.add("open");
+}
+
+function closeEntryDetailModal() {
+  document.getElementById("entryDetailModal").classList.remove("open");
+}
+
+// --- PAYMENT HISTORY MODAL LOGIC ---
+let cachedPaymentHistoryItems = [];
+function openPaymentHistoryModal() {
+  const k = document.getElementById("cycleSelect").value;
+  if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
+  
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); 
+    return keyFromDateForMethod(x.date, m) === k; 
+  });
+
+  cachedPaymentHistoryItems = [];
+  let totalHistAmt = 0;
+  let payerSummary = {};
+
+  es.forEach(x => {
+    let m = x.method || "CreditCard";
+    if (x.repayments && x.repayments.length > 0) {
+      x.repayments.forEach(r => {
+        let rKey = keyFromDateForMethod(r.date, m);
+        if (rKey === k) {
+          totalHistAmt += r.amount;
+          let p = r.payer || "ทั่วไป";
+          payerSummary[p] = (payerSummary[p] || 0) + r.amount;
+          
+          cachedPaymentHistoryItems.push({
+            type: 'normal', entryId: x.id, itemId: r.id, itemName: x.item, method: x.method || "CreditCard", date: r.date, amount: r.amount, payer: r.payer, image: r.image
+          });
+        }
+      });
+    }
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => {
+        if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) {
+          totalHistAmt += s.amount;
+          let p = s.payer || "ทั่วไป";
+          payerSummary[p] = (payerSummary[p] || 0) + s.amount;
+
+          cachedPaymentHistoryItems.push({
+            type: 'installment', entryId: x.id, scheduleNo: s.no, itemName: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`, method: x.method || "CreditCard", date: s.paidDate || s.dueDate, amount: s.amount, payer: s.payer, image: s.image
+          });
+        }
+      });
+    }
+  });
+
+  document.getElementById("payHistCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)} (${cachedPaymentHistoryItems.length} รายการที่ชำระแล้ว)`;
+
+  let summaryBoxHtml = "";
+  if (cachedPaymentHistoryItems.length > 0) {
+    let chips = Object.keys(payerSummary).map(p => `<div style="background:rgba(255,255,255,0.2); padding:5px 10px; border-radius:10px; font-size:11.5px; backdrop-filter:blur(4px);">👤 ${esc(p)}: <strong>฿${money(payerSummary[p])}</strong></div>`).join("");
+    summaryBoxHtml = `
+      <div style="background:linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius:20px; padding:16px; color:#fff; margin-bottom:14px; box-shadow:0 6px 18px rgba(126,168,138,0.3);">
+        <div style="font-size:11.5px; opacity:0.9; text-transform:uppercase; letter-spacing:0.5px;">ยอดชำระสำเร็จรวมในรอบ/เดือนนี้</div>
+        <div style="font-size:26px; font-weight:700; margin:4px 0 10px; letter-spacing:-0.5px;">฿${money(totalHistAmt)}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">${chips}</div>
+      </div>`;
+  }
+  document.getElementById("payHistSummaryBox").innerHTML = summaryBoxHtml;
+  document.getElementById("payHistSearch").value = "";
+  document.getElementById("payHistSort").value = "dateDesc";
+
+  renderPaymentHistoryList();
+  document.getElementById("paymentHistoryModal").classList.add("open");
+}
+
+function renderPaymentHistoryList() {
+  const keyword = (document.getElementById("payHistSearch").value || "").toLowerCase();
+  const sortType = document.getElementById("payHistSort").value;
+
+  let filtered = cachedPaymentHistoryItems.filter(h => {
+    let matchName = h.itemName.toLowerCase().includes(keyword);
+    let matchPayer = (h.payer || "").toLowerCase().includes(keyword);
+    let matchMethod = h.method.toLowerCase().includes(keyword);
+    return matchName || matchPayer || matchMethod;
+  });
+
+  filtered.sort((a, b) => {
+    if (sortType === 'dateDesc') return b.date.localeCompare(a.date);
+    if (sortType === 'dateAsc') return a.date.localeCompare(b.date);
+    if (sortType === 'amountDesc') return b.amount - a.amount;
+    if (sortType === 'amountAsc') return a.amount - b.amount;
+    return 0;
+  });
+
+  let groups = {};
+  filtered.forEach(h => {
+    let m = h.method || "อื่นๆ";
+    if (!groups[m]) groups[m] = [];
+    groups[m].push(h);
+  });
+
+  let html = "";
+  if (Object.keys(groups).length === 0) {
+    html = `<div style="text-align:center; padding:30px; color:var(--text-muted);">ไม่พบประวัติการชำระเงินตามเงื่อนไข 📭</div>`;
+  } else {
+    for (let method in groups) {
+      let items = groups[method];
+      let channelTotal = items.reduce((sum, i) => sum + i.amount, 0);
+
+      html += `
+        <div style="margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg); padding:8px 12px; border-radius:10px; margin-bottom:8px; box-shadow:inset 2px 2px 5px var(--shadow-dark);">
+            <strong style="font-size:13.5px; color:var(--primary-dark);">🏷️ ช่องทาง: ${esc(method)} (${items.length} รายการ)</strong>
+            <span style="font-size:12px; font-weight:700; color:var(--text-main);">รวม ฿${money(channelTotal)}</span>
+          </div>`;
+
+      items.forEach(h => {
+        let slipThumbnail = h.image ? `<img src="${h.image}" style="width:100%; height:100%; object-fit:cover; cursor:pointer;" onclick="viewImage('${h.image}')">` : '<span style="opacity:0.3; font-size:12px;">📷</span>';
+        let cancelAction = h.type === 'installment' 
+          ? `cancelPaymentItem('${h.entryId}', 'installment', ${h.scheduleNo})` 
+          : `cancelPaymentItem('${h.entryId}', 'normal', '${h.itemId}')`;
+
+        html += `
+          <div style="background:var(--surface-white); border-radius:14px; padding:10px 12px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.02);">
+            <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+              <div style="width:38px; height:38px; border-radius:10px; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; box-shadow:inset 2px 2px 4px var(--shadow-dark);">${slipThumbnail}</div>
+              <div style="overflow:hidden;">
+                <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(h.itemName)}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${fmtDate(h.date)} ${h.payer ? '• ('+h.payer+')' : ''}</div>
+              </div>
+            </div>
+            <div style="text-align:right; flex-shrink:0; display:flex; align-items:center; gap:8px;">
+              <div>
+                <div style="font-size:13.5px; font-weight:700; color:var(--primary-dark);">฿${money(h.amount)}</div>
+                <div style="font-size:9px; color:var(--primary); font-weight:600;">จ่ายแล้ว ✓</div>
+              </div>
+              <button class="badge" style="background:var(--bg); color:var(--danger); border:none; padding:5px 8px; cursor:pointer; font-weight:600;" onclick="${cancelAction}" title="ยกเลิกการชำระ">ยกเลิก</button>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+  }
+
+  document.getElementById("payHistContainer").innerHTML = html;
+}
+
+function closePaymentHistoryModal() {
+  document.getElementById("paymentHistoryModal").classList.remove("open");
+}
+
+async function cancelPaymentItem(entryId, type, idOrNo) {
+  if (!confirm("⚠️ คุณต้องการยกเลิกการชำระรายการนี้ใช่หรือไม่? ยอดเงินและภาระหนี้จะถูกคืนกลับมา")) return;
+  const e = entries.find(x => x.id === entryId);
+  if (!e) return;
+
+  if (type === 'installment') {
+    let plan = e.installmentPlan;
+    plan.schedules = plan.schedules.map(s => {
+      if (s.no === idOrNo) {
+        return { ...s, paid: false, image: null, paidDate: null, payer: null };
+      }
+      return s;
+    });
+    await db.collection("entries").doc(entryId).update({ installmentPlan: plan });
+  } else {
+    let updatedRepayments = (e.repayments || []).filter(r => r.id !== idOrNo);
+    await db.collection("entries").doc(entryId).update({ repayments: updatedRepayments });
+  }
+
+  openPaymentHistoryModal();
+  render();
+  alert("✅ ยกเลิกการชำระและซิงค์ข้อมูลเรียบร้อยแล้ว!");
+}
+
+// --- BULK REPAYMENT LOGIC ---
+function openBulkRepayModal() {
+  const k = document.getElementById("cycleSelect").value;
+  if(!k) return alert("กรุณาเลือกรอบ/เดือนก่อนครับ");
+  document.getElementById("bulkModalCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
+  
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); 
+    return keyFromDateForMethod(x.date, m) === k; 
+  });
+
+  let html = "";
+  let unpaidCount = 0;
+  es.forEach(x => {
+    let eff = getEffectiveItemData(x, k);
+    let isCredit = getChannelType(x.method || "CreditCard") === 'credit';
+    
+    // โชว์เฉพาะหนี้สินเชื่อในหน้า Bulk Repay
+    if(eff.remain > 0 && isCredit) {
+      unpaidCount++;
+      html += `
+        <div style="display:flex; align-items:center; justify-content:space-between; background:var(--surface-white); padding:10px 12px; border-radius:12px; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+            <input type="checkbox" class="bulk-item-checkbox" data-id="${x.id}" data-remain="${eff.remain}" onchange="updateBulkTotal()" style="width:18px; height:18px; accent-color:var(--primary); box-shadow:none;">
+            <div style="overflow:hidden;">
+              <div style="font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(x.item)}</div>
+              <div style="font-size:11px; color:var(--text-muted);">${esc(x.method)} • ค้าง <strong>฿${money(eff.remain)}</strong></div>
+            </div>
+          </div>
+        </div>`;
+    }
+  });
+
+  document.getElementById("bulkSelectListLabel").textContent = `เลือกรายการที่ต้องการเคลียร์หนี้ (${unpaidCount} รายการ):`;
+
+  if(unpaidCount === 0) {
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการหนี้ค้างชำระในรอบ/เดือนนี้ 🎉</div>`;
+  }
+
+  document.getElementById("bulkItemsContainer").innerHTML = html;
+  document.getElementById("bulkDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`;
+  document.getElementById("bulkImg").value = "";
+  document.getElementById("bulkShareSlip").checked = true;
+  updateBulkTotal();
+  document.getElementById("bulkRepayModal").classList.add("open");
+}
+
+function closeBulkRepayModal() { document.getElementById("bulkRepayModal").classList.remove("open"); }
+
+function toggleSelectAllBulk(select) {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox');
+  checkboxes.forEach(cb => cb.checked = select);
+  updateBulkTotal();
+}
+
+function updateBulkTotal() {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+  let total = 0;
+  checkboxes.forEach(cb => {
+    total += Number(cb.getAttribute('data-remain')) || 0;
+  });
+  document.getElementById("bulkSelectedTotalAmt").textContent = "฿" + money(total);
+}
+
+function openBulkConfirmModal() {
+  const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+  if(checkboxes.length === 0) {
+    alert("กรุณาเลือกอย่างน้อย 1 รายการที่ต้องการชำระ");
+    return;
+  }
+  const totalStr = document.getElementById("bulkSelectedTotalAmt").textContent;
+  document.getElementById("bulkConfirmText").textContent = `คุณกำลังจะบันทึกชำระหนี้จำนวน ${checkboxes.length} รายการ รวมเป็นเงิน ${totalStr} แน่ใจหรือไม่?`;
+  document.getElementById("bulkConfirmModal").classList.add("open");
+}
+
+function closeBulkConfirmModal() { document.getElementById("bulkConfirmModal").classList.remove("open"); }
+
+async function confirmBulkRepay() {
+  const btn = document.getElementById("btnConfirmBulkExec");
+  try {
+    btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
+    const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+    const date = document.getElementById("bulkDate").value;
+    const payer = document.getElementById("bulkPayerSelect").value;
+    const shareSlip = document.getElementById("bulkShareSlip").checked;
+    const currentCycleKey = document.getElementById("cycleSelect").value;
+
+    const file = document.getElementById("bulkImg").files[0];
+    const b64Img = await compressImage(file);
+    const finalSlip = shareSlip ? b64Img : null;
+
+    for (let cb of checkboxes) {
+      let id = cb.getAttribute('data-id');
+      let remainAmt = Number(cb.getAttribute('data-remain')) || 0;
+      let e = entries.find(x => x.id === id);
+      if(!e) continue;
+
+      if (e.isInstallment && e.installmentPlan) {
+        let m = e.method || "CreditCard";
+        let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid);
+        if (targetSchedule) {
+          targetSchedule.paid = true;
+          targetSchedule.image = finalSlip;
+          targetSchedule.paidDate = date;
+          targetSchedule.payer = payer;
+          await db.collection("entries").doc(id).update({ installmentPlan: e.installmentPlan });
+        }
+      } else {
+        if (payer === "obligation") {
+          let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu");
+          let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B");
+          let newRepays = [];
+          if (nuBreak.remain > 0) {
+            newRepays.push({ id: Date.now().toString() + '_nu_' + Math.random().toString(36).substring(2,5), date, amount: nuBreak.remain, payer: "Nu", image: finalSlip });
+          }
+          if (bBreak.remain > 0) {
+            newRepays.push({ id: Date.now().toString() + '_b_' + Math.random().toString(36).substring(2,5), date, amount: bBreak.remain, payer: "B", image: finalSlip });
+          }
+          if (newRepays.length > 0) {
+            await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) });
+          }
+        } else {
+          const newRepay = { id: Date.now().toString() + Math.random().toString(36).substring(2,5), date, amount: remainAmt, payer: payer, image: finalSlip };
+          await db.collection("entries").doc(id).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) });
+        }
+      }
+    }
+
+    closeBulkConfirmModal();
+    closeBulkRepayModal();
+    alert("✅ บันทึกชำระหนี้แบบกลุ่มสำเร็จเรียบร้อย!");
+  } catch (err) {
+    alert("เกิดข้อผิดพลาด: " + err.message);
+  } finally {
+    btn.textContent = "ยืนยันชำระทั้งหมด"; btn.disabled = false;
+  }
+}
+
+// Visual Analytics Modal (อัปเดตให้คำนวณตาม Calendar Month)
+function openAnalyticsModal() {
+  const k = document.getElementById("cycleSelect").value;
+  document.getElementById("analyticsCycleLabel").textContent = `เดือนปฏิทิน: ${cycleLabel(k).split(' (')[0]}`;
+  
+  let catMap = {};
+  let totalCycleSpent = 0;
+  
+  entries.forEach(x => {
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => {
+        if (s.dueDate && s.dueDate.startsWith(k)) {
+          let cat = x.category || "อื่นๆ";
+          catMap[cat] = (catMap[cat] || 0) + s.amount;
+          totalCycleSpent += s.amount;
+        }
+      });
+    } else {
+      if (x.date && x.date.startsWith(k)) {
+        let cat = x.category || "อื่นๆ";
+        catMap[cat] = (catMap[cat] || 0) + x.amount;
+        totalCycleSpent += x.amount;
+      }
+    }
+  });
+
+  let html = "";
+  const catKeys = Object.keys(catMap);
+  if (catKeys.length === 0) {
+    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ยังไม่มีข้อมูลค่าใช้จ่ายในเดือนนี้</div>`;
+  } else {
+    html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">พบหมวดหมู่การใช้จ่ายทั้งหมด (${catKeys.length} หมวดหมู่):</div>`;
+    for (let cat in catMap) {
+      let amt = catMap[cat];
+      let pct = totalCycleSpent > 0 ? (amt / totalCycleSpent) * 100 : 0;
+      html += `<div style="margin-bottom:12px; background:var(--bg); padding:12px; border-radius:12px; box-shadow:inset 2px 2px 5px var(--shadow-dark);">
+                <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:4px;">
+                  <span><strong>${esc(cat)}</strong></span>
+                  <span>฿${money(amt)} (${pct.toFixed(1)}%)</span>
+                </div>
+                <div style="width:100%; height:7px; background:var(--shadow-dark); border-radius:4px; overflow:hidden;">
+                  <div style="width:${pct}%; height:100%; background:var(--primary); border-radius:4px;"></div>
+                </div>
+               </div>`;
+    }
+  }
+  document.getElementById("analyticsContent").innerHTML = html;
+  document.getElementById("analyticsModal").classList.add("open");
+}
+function closeAnalyticsModal() { document.getElementById("analyticsModal").classList.remove("open"); }
+
+// LINE Share Text Modal
+function openLineShareModal() {
+  const k = document.getElementById("cycleSelect").value;
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); 
+    return keyFromDateForMethod(x.date, m) === k; 
+  });
+
+  let tR = 0;
+  let pSpent = { "Nu": 0, "B": 0 };
+  let pRemain = { "Nu": 0, "B": 0 };
+
+  es.forEach(x => {
+    let isCredit = getChannelType(x.method || 'CreditCard') === 'credit';
+    const eff = getEffectiveItemData(x, k);
+    if(isCredit) { tR += eff.remain; } // LINE share โชว์เฉพาะยอดหนี้สินเชื่อรวม
+
+    ["Nu", "B"].forEach(p => {
+      let b = getPersonItemBreakdown(x, k, p);
+      pSpent[p] += b.spent;
+      pRemain[p] += b.remain;
+    });
+  });
+
+  let text = `📢 สรุปยอดค่าใช้จ่ายรอบ/เดือน (${cycleLabel(k)})\n`;
+  text += `━━━━━━━━━━━━━━━\n`;
+  text += `💰 ยอดค้างรวมทั้งหมด (เฉพาะหนี้): ฿${money(tR)}\n\n`;
+  text += `👤 ยอดหนี้ของ Nu: ฿${money(pRemain["Nu"])} (ใช้จ่ายไปรวม ฿${money(pSpent["Nu"])})\n`;
+  text += `👤 ยอดหนี้ของ B: ฿${money(pRemain["B"])} (ใช้จ่ายไปรวม ฿${money(pSpent["B"])})\n`;
+  text += `━━━━━━━━━━━━━━━\n`;
+  text += `✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
+
+  document.getElementById("lineShareTextOutput").value = text;
+  document.getElementById("lineShareModal").classList.add("open");
+}
+function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
+function copyLineTextToClipboard() {
+  const textarea = document.getElementById("lineShareTextOutput");
+  textarea.select();
+  navigator.clipboard.writeText(textarea.value);
+  alert("📋 คัดลอกข้อความสรุปสำหรับส่ง LINE เรียบร้อยแล้ว!");
+}
+
+// ฟังก์ชันคำนวณดอกเบี้ย Two-way
+function autoCalculateInterest() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const perMonth = Number(document.getElementById('addPerMonth').value) || 0;
+
+  if (principal > 0 && months > 0 && perMonth > 0) {
+    let totalToPay = perMonth * months;
+    let totalInterest = totalToPay - principal;
+    if (totalInterest < 0) totalInterest = 0;
+
+    document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+    let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+    document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
+  }
+}
+
+function onPercentInput() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const annualPercent = Number(document.getElementById('addInterestPercent').value) || 0;
+  if (principal > 0 && months > 0) {
+    let totalInterest = principal * (annualPercent / 100) * (months / 12);
+    document.getElementById('addInterestBaht').value = totalInterest.toFixed(2);
+    let totalToPay = principal + totalInterest;
+    document.getElementById('addPerMonth').value = (totalToPay / months).toFixed(2);
+  }
+}
+
+function onBahtInput() {
+  const principal = Number(document.getElementById('amount').value) || 0;
+  const months = Number(document.getElementById('addMonths').value) || 0;
+  const totalInterest = Number(document.getElementById('addInterestBaht').value) || 0;
+  if (principal > 0 && months > 0) {
+    let annualPercent = principal > 0 ? (totalInterest / principal) * (12 / months) * 100 : 0;
+    document.getElementById('addInterestPercent').value = annualPercent.toFixed(2);
+    let totalToPay = principal + totalInterest;
+    document.getElementById('addPerMonth').value = (totalToPay / months).toFixed(2);
+  }
+}
+
+function toggleSplitMode() {
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  const nuInput = document.getElementById('splitNuInput');
+  const bInput = document.getElementById('splitBInput');
+
+  if (mode === 'percent') {
+    nuInput.value = 50;
+    bInput.value = 50;
+  } else {
+    let half = totalAmt / 2;
+    nuInput.value = half.toFixed(2);
+    bInput.value = half.toFixed(2);
+  }
+}
+
+function onAmountChangeForSplit() {
+  const owner = document.querySelector('input[name="owner"]:checked').value;
+  if (owner !== "Nu & B") return;
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  if (mode === 'amount') {
+    let nuVal = Number(document.getElementById('splitNuInput').value) || 0;
+    document.getElementById('splitBInput').value = Math.max(0, totalAmt - nuVal).toFixed(2);
+  }
+}
+
+function onSplitInput(changed) {
+  const mode = document.querySelector('input[name="splitMode"]:checked').value;
+  const totalAmt = Number(document.getElementById('amount').value) || 0;
+  const nuInput = document.getElementById('splitNuInput');
+  const bInput = document.getElementById('splitBInput');
+
+  if (mode === 'percent') {
+    let nuVal = Number(nuInput.value) || 0;
+    let bVal = Number(bInput.value) || 0;
+    if (changed === 'Nu') {
+      bInput.value = Math.max(0, 100 - nuVal).toFixed(2);
+    } else {
+      nuInput.value = Math.max(0, 100 - bVal).toFixed(2);
+    }
+  } else {
+    let nuVal = Number(nuInput.value) || 0;
+    let bVal = Number(bInput.value) || 0;
+    if (changed === 'Nu') {
+      bInput.value = Math.max(0, totalAmt - nuVal).toFixed(2);
+    } else {
+      nuInput.value = Math.max(0, totalAmt - bVal).toFixed(2);
+    }
+  }
+}
+
+function importJSON() {
+  try {
+    const rawData = document.getElementById('jsonImportData').value.trim();
+    if(!rawData) { alert("กรุณาวางโค้ด JSON ก่อนครับ"); return; }
+    const cleanData = rawData.replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = JSON.parse(cleanData);
+
+    if(data.date) document.getElementById('date').value = data.date;
+    if(data.item) document.getElementById('item').value = data.item;
+    if(data.orderNo) document.getElementById('orderNo').value = data.orderNo;
+    if(data.txNo) document.getElementById('txNo').value = data.txNo;
+    if(data.note) document.getElementById('note').value = data.note;
+    if(data.method) document.getElementById('method').value = data.method;
+    if(data.category) document.getElementById('category').value = data.category;
+
+    if(data.owner) {
+      let mappedOwner = (data.owner === "Nu and B") ? "Nu & B" : data.owner;
+      const radio = document.querySelector(`input[name="owner"][value="${mappedOwner}"]`);
+      if(radio) { radio.checked = true; } else { document.querySelector(`input[name="owner"][value="Other"]`).checked = true; document.getElementById('ownerCustom').value = mappedOwner; }
+      toggleOwnerInput();
+    }
+
+    if(data.txType === 'installment' && data.addMonths > 1) {
+      document.querySelector(`input[name="txType"][value="installment"]`).checked = true;
+      toggleTxType();
+      document.getElementById('addMonths').value = data.addMonths;
+      if(data.perMonth !== undefined) document.getElementById('addPerMonth').value = data.perMonth;
+      
+      if(data.startDate) { document.getElementById('addStartDate').value = data.startDate; } 
+      else if (data.schedules && data.schedules.length > 0 && data.schedules[0].dueDate) { document.getElementById('addStartDate').value = data.schedules[0].dueDate; } 
+      else if(data.date) { document.getElementById('addStartDate').value = data.date; }
+
+      let principal = Number(data.amount) || 0;
+      let calculatedInterestBaht = Number(data.interestBaht) || 0;
+      if(principal === 0 && data.perMonth) {
+        let totalSum = data.perMonth * data.addMonths;
+        principal = totalSum - calculatedInterestBaht;
+      }
+      
+      document.getElementById('amount').value = principal > 0 ? principal.toFixed(2) : "";
+      document.querySelector(`input[name="interestType"][value="percent"]`).checked = true;
+      toggleInterestInput();
+      
+      let finalAnnual = Number(data.annualInterest) || 0;
+      if (finalAnnual === 0 && calculatedInterestBaht > 0 && principal > 0 && data.addMonths > 0) {
+        finalAnnual = (calculatedInterestBaht / principal) * (12 / data.addMonths) * 100;
+      }
+      document.getElementById('addInterestPercent').value = finalAnnual.toFixed(2);
+      onPercentInput();
+      window._importedSchedules = data.schedules || null;
+    } else {
+      document.querySelector(`input[name="txType"][value="normal"]`).checked = true; toggleTxType();
+      if(data.amount !== undefined) document.getElementById('amount').value = data.amount;
+      window._importedSchedules = null;
+    }
+    toggleTxNo();
+    alert("✅ นำเข้าข้อมูลและสถานะการจ่ายแต่ละงวดสำเร็จ!");
+    document.getElementById('jsonImportData').value = ""; document.getElementById('jsonImportBox').classList.add('hidden');
+  } catch (error) { alert("❌ รูปแบบ JSON ไม่ถูกต้อง!"); console.error(error); }
+}
+
+async function addEntry(){
+  const btn = document.getElementById("btnAddEntry");
+  try {
+    const date = document.getElementById("date").value; const item = document.getElementById("item").value.trim();
+    let amount = Number(document.getElementById("amount").value); const owner = getOwnerName(); const method = document.getElementById("method").value;
+    let category = document.getElementById("category").value; if(category === "อื่นๆ" && document.getElementById("catCustom").value.trim() !== "") category = document.getElementById("catCustom").value.trim();
+    const note = document.getElementById("note").value.trim(); const isTxVisible = !document.getElementById("txNoContainer").classList.contains('hidden');
+    const orderNo = isTxVisible ? document.getElementById("orderNo").value.trim() : ""; const txNo = isTxVisible ? document.getElementById("txNo").value.trim() : "";
+    const isInst = document.querySelector('input[name="txType"]:checked').value === "installment";
+
+    if(!date || !item || !Number.isFinite(amount) || amount <= 0){ alert("กรุณากรอกข้อมูลให้ครบถ้วน"); return; }
+    
+    let splitDetails = null;
+    if (owner === "Nu & B") {
+      const mode = document.querySelector('input[name="splitMode"]:checked').value;
+      const nuVal = Number(document.getElementById('splitNuInput').value) || 50;
+      const bVal = Number(document.getElementById('splitBInput').value) || 50;
+      splitDetails = { mode, Nu: nuVal, B: bVal };
+    }
+
+    btn.textContent = "กำลังบันทึก..."; btn.disabled = true;
+    const file = document.getElementById("entryImg").files[0]; const b64Img = await compressImage(file);
+    
+    let entryData = { date, item, amount, owner, splitDetails, method, category, note, orderNo, transactionNo: txNo, image: b64Img, repayments: [], isInstallment: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+    if (isInst) {
+      const months = Number(document.getElementById("addMonths").value) || 5; 
+      const customPerMonth = Number(document.getElementById("addPerMonth").value) || 0; 
+      let annualInterest = Number(document.getElementById("addInterestPercent").value) || 0;
+      let totalInterest = Number(document.getElementById("addInterestBaht").value) || (amount * (annualInterest / 100) * (months / 12));
+      
+      if (annualInterest === 0 && totalInterest > 0 && amount > 0 && months > 0) {
+        annualInterest = (totalInterest / amount) * (12 / months) * 100;
+      }
+      
+      let totalToPay = amount + totalInterest; 
+      let perMonth = customPerMonth > 0 ? customPerMonth : (totalToPay / months); 
+      let schedules = [];
+      let [y, m, d] = (document.getElementById("addStartDate").value || date).split("-").map(Number);
+      
+      for(let i=1; i<=months; i++) {
+        let isPaid = false; let scheduleDueDate = null; let schedImage = null; let schedPaidDate = null; let schedPayer = null;
+        if (window._importedSchedules && window._importedSchedules[i-1] !== undefined) {
+          isPaid = !!window._importedSchedules[i-1].paid;
+          if (window._importedSchedules[i-1].dueDate) scheduleDueDate = window._importedSchedules[i-1].dueDate;
+          if (window._importedSchedules[i-1].image) schedImage = window._importedSchedules[i-1].image;
+          if (window._importedSchedules[i-1].paidDate) schedPaidDate = window._importedSchedules[i-1].paidDate;
+          if (window._importedSchedules[i-1].payer) schedPayer = window._importedSchedules[i-1].payer;
+        }
+        if(!scheduleDueDate) { let payDateObj = new Date(y, m - 1 + (i - 1), d); scheduleDueDate = `${payDateObj.getFullYear()}-${pad(payDateObj.getMonth() + 1)}-${pad(payDateObj.getDate())}`; }
+        schedules.push({ no: i, dueDate: scheduleDueDate, amount: Number(perMonth.toFixed(2)), paid: isPaid, image: schedImage, paidDate: schedPaidDate, payer: schedPayer });
+      }
+      window._importedSchedules = null; 
+      entryData.isInstallment = true;
+      entryData.installmentPlan = { months, annualInterest, totalToPay: Number(totalToPay.toFixed(2)), perMonth: Number(perMonth.toFixed(2)), schedules };
+    }
+    await db.collection("entries").add(entryData);
+    document.getElementById("item").value=""; document.getElementById("amount").value=""; document.getElementById("orderNo").value=""; document.getElementById("txNo").value=""; document.getElementById("note").value=""; document.getElementById("catCustom").value=""; document.getElementById("entryImg").value = ""; document.getElementById("addPerMonth").value = "";
+    document.querySelector('input[name="txType"][value="normal"]').checked = true; toggleTxType();
+    userChangedCycle = false; refreshCycles(); switchView('home');
+  } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
+}
+
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.11.0", JSON.stringify(localSettings)); }
+function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+
+function fmtDate(s){ 
+  if(!s) return "-";
+  let d = parseDate(s); 
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}`; 
+}
+
+function esc(s){ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+
+function switchView(view) {
+  document.getElementById('view-home').classList.add('hidden'); document.getElementById('view-add').classList.add('hidden');
+  if(view === 'home') { 
+    document.getElementById('view-home').classList.remove('hidden'); 
+    document.getElementById('navHome').classList.add('active'); 
+  } else if(view === 'add') { 
+    document.getElementById('view-add').classList.remove('hidden'); 
+    document.getElementById('navHome').classList.remove('active'); 
+    const now = new Date(); const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("date").value = dateStr; document.getElementById("addStartDate").value = dateStr; 
+  }
+  window.scrollTo(0,0);
+}
+
+if(db) { db.collection("entries").orderBy("createdAt", "desc").onSnapshot((snapshot) => { entries = []; snapshot.forEach((doc) => { let dat = doc.data(); if(dat.owner === "Nu and B") dat.owner = "Nu & B"; entries.push({ id: doc.id, ...dat }); }); refreshCycles(); render(); }, (error) => {}); }
+function compressImage(file) { return new Promise((resolve) => { if(!file) return resolve(null); const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = (e) => { const img = new Image(); img.src = e.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const MAX = 400; const scale = img.width > MAX ? (MAX / img.width) : 1; canvas.width = img.width * scale; canvas.height = img.height * scale; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); resolve(canvas.toDataURL('image/jpeg', 0.6)); } } }); }
+function viewImage(src) { if(!src) return; document.getElementById('fullViewImg').src = src; document.getElementById('imgViewerModal').classList.add('open'); }
+function closeImgViewer() { document.getElementById('imgViewerModal').classList.remove('open'); }
+
+// --- Dual-Engine Architecture ---
+function getChannelType(method) { if (["Cash/Transfer", "ShopeePay", "Other"].includes(method)) return 'cash'; return 'credit'; }
+function getChannelCutoff(method) { let ch = localSettings.channels[method]; if(!ch) { if(defaultChannels[method]) return defaultChannels[method].cutoff; if(method === "Cash/Transfer" || method === "ShopeePay" || method === "Other") return 31; return 17; } return Number(ch.cutoff) || 17; }
+function keyFromDateForMethod(dateStr, method) { const d = parseDate(dateStr); if (getChannelType(method) === 'cash') { return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; } else { const c = getChannelCutoff(method); if(d.getDate() <= c) return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; let n = new Date(d.getFullYear(), d.getMonth()+1, 1); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; } }
+function keyFromDate(s){ return keyFromDateForMethod(s, "CreditCard"); }
+function cycleLabel(k){ let [y,m] = k.split("-").map(Number); let c = getChannelCutoff("CreditCard"); let end = new Date(y, m-1, c); let start = new Date(y, m-2, c + 1); const thaiMonths = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]; return `${thaiMonths[m-1]} ${y+543} (บิลบัตร: ${pad(start.getDate())}/${pad(start.getMonth()+1)} - ${pad(end.getDate())}/${pad(end.getMonth()+1)})`; }
+function allKeys(){ let keysSet = new Set(); const nowKey = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}`; keysSet.add(nowKey); entries.forEach(x => { let m = x.method || "CreditCard"; if(x.date) keysSet.add(keyFromDateForMethod(x.date, m)); if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) { x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(keyFromDateForMethod(s.dueDate, m)); }); } }); return Array.from(keysSet).sort().reverse(); }
+function refreshCycles(){ let ks = allKeys(); const s = document.getElementById("cycleSelect"); const nowKey = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}`; const targetKey = (!userChangedCycle && ks.includes(nowKey)) ? nowKey : (s.value || ks[0]); s.innerHTML = ks.map(k => `<option value="${k}">${cycleLabel(k)}</option>`).join(""); if(ks.includes(targetKey)) s.value = targetKey; }
+
+// Core Data Function (เคลียร์เงินสดออกจากการเป็นหนี้ 100%)
+function getEffectiveItemData(e, selectedCycleKey) {
+  let m = e.method || "CreditCard";
+  let isCash = getChannelType(m) === 'cash';
+  
+  if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
+    let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
+    let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
+    let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
+    
+    if (isCash) paidSchedulesSum = effectiveAmount; 
+    let effectiveRemain = effectiveAmount - paidSchedulesSum;
+    
+    return { amount: effectiveAmount, repaid: paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
+  } else { 
+    let r = getRepaidSum(e); 
+    if (isCash) r = e.amount; 
+    let rm = e.amount - r; 
+    return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; 
+  }
+}
+
+function getShareForPerson(x, totalAmt, personName) {
+  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+  if (!owners.includes(personName)) return 0;
+  if (owners.length === 1) return totalAmt;
+  if (x.splitDetails) {
+    if (x.splitDetails.mode === 'percent') return totalAmt * ((Number(x.splitDetails[personName]) || 50) / 100);
+    else return totalAmt * ((Number(x.splitDetails[personName]) || (x.amount / 2)) / (x.amount > 0 ? x.amount : 1));
+  } else { return totalAmt * 0.5; }
+}
+
+function calculateShareBreakdown(totalAmt, shares, repayments) {
+  let personKeys = Object.keys(shares); let result = {};
+  personKeys.forEach(p => { result[p] = { spent: shares[p], paid: 0, remain: shares[p] }; });
+  let totalRepaid = repayments.reduce((sum, r) => sum + r.amount, 0);
+  
+  if (totalRepaid >= totalAmt - 0.005) { personKeys.forEach(p => { result[p].paid = shares[p]; result[p].remain = 0; }); return result; }
+  
+  personKeys.forEach(p => { let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0); let allocatedToP = Math.min(shares[p], directForP); result[p].paid += allocatedToP; result[p].remain = Math.max(0, shares[p] - result[p].paid); });
+  
+  let unassigned = repayments.filter(r => !r.payer || r.payer === "").reduce((sum, r) => sum + r.amount, 0);
+  if (unassigned > 0) {
+    let totalRemainNeeded = personKeys.reduce((sum, p) => sum + result[p].remain, 0);
+    if (totalRemainNeeded > 0) {
+      personKeys.forEach(p => { let shareOfUnassigned = unassigned * (result[p].remain / totalRemainNeeded); let actualAlloc = Math.min(result[p].remain, shareOfUnassigned); result[p].paid += actualAlloc; result[p].remain = Math.max(0, shares[p] - result[p].paid); });
+    }
+  }
+  
+  personKeys.forEach(p => {
+    let directForP = repayments.filter(r => r.payer === p).reduce((sum, r) => sum + r.amount, 0); let excess = directForP - shares[p];
+    if (excess > 0) {
+      let otherPersons = personKeys.filter(other => other !== p && result[other].remain > 0); let totalOtherRemain = otherPersons.reduce((sum, other) => sum + result[other].remain, 0);
+      if (totalOtherRemain > 0) { otherPersons.forEach(other => { let cover = Math.min(result[other].remain, excess * (result[other].remain / totalOtherRemain)); result[other].paid += cover; result[other].remain = Math.max(0, shares[other] - result[other].paid); }); }
+    }
+  });
+  personKeys.forEach(p => { result[p].paid = Math.min(shares[p], result[p].paid); result[p].remain = Math.max(0, shares[p] - result[p].paid); });
+  return result;
+}
+
+// จำลองการจ่ายเงินสดว่า "ต่างคนต่างจ่ายส่วนตัวเองเต็มจำนวน" (ไม่เกิดหนี้)
+function getPersonItemBreakdown(x, selectedCycleKey, personName) {
+  let m = x.method || "CreditCard";
+  let isCash = getChannelType(m) === 'cash';
+  let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+  if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
+
+  let totalSpent = 0; let totalPaid = 0; let totalRemain = 0;
+
+  if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+    let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForMethod(s.dueDate, m) === selectedCycleKey);
+    matchingSchedules.forEach(s => {
+      let scheduleTotal = s.amount; let shares = {}; owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); });
+      let scheduleRepayments = [];
+      if (s.paid || isCash) {
+        if (isCash) { owners.forEach(o => scheduleRepayments.push({amount: shares[o], payer: o})); } 
+        else { scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || "", image: s.image }); }
+      }
+      let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments);
+      totalSpent += breakdown[personName].spent; totalPaid += breakdown[personName].paid; totalRemain += breakdown[personName].remain;
+    });
+  } else {
+    let cycleKey = keyFromDateForMethod(x.date, m);
+    if (cycleKey === selectedCycleKey) {
+      let eff = getEffectiveItemData(x, selectedCycleKey); let totalAmt = eff.amount; let shares = {}; owners.forEach(o => { shares[o] = getShareForPerson(x, totalAmt, o); });
+      let actualRepayments = x.repayments || [];
+      if (isCash) { actualRepayments = owners.map(o => ({ amount: shares[o], payer: o })); }
+      let breakdown = calculateShareBreakdown(totalAmt, shares, actualRepayments);
+      totalSpent += breakdown[personName].spent; totalPaid += breakdown[personName].paid; totalRemain += breakdown[personName].remain;
+    }
+  }
+  return { spent: totalSpent, paid: totalPaid, remain: totalRemain };
+}
+
+// --- RENDERING MAIN ---
+function render(){
+  if(document.getElementById("cycleSelect").options.length === 0) refreshCycles(); const k = document.getElementById("cycleSelect").value;
+  if(document.getElementById("cycleSelect").options.length > 0) document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
+  checkDueAlerts(k);
+  const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
+
+  let tR = 0; let pD = { "Nu": { s: 0, p: 0, rm: 0 }, "B": { s: 0, p: 0, rm: 0 } }; 
+  let sharedSpent = 0; let nuPaidSum = 0; let bPaidSum = 0; let entriesHtml = "";
+  
+  if (es.length > 0) {
+    entriesHtml = es.map(x => {
+      const eff = getEffectiveItemData(x, k); 
+      let m = x.method || "CreditCard";
+      let isCash = getChannelType(m) === 'cash';
+
+      // คำนวณเฉพาะ "ยอดหนี้สินเชื่อ" ให้รวมในยอดค้าง
+      if (!isCash) { tR += eff.remain; }
+
+      let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
+      if (x.owner === "Nu & B" || x.owner === "Nu and B") {
+        sharedSpent += eff.amount;
+        if (x.repayments) { x.repayments.forEach(r => { if (r.payer === "Nu") nuPaidSum += r.amount; if (r.payer === "B") bPaidSum += r.amount; }); }
+        if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+          x.installmentPlan.schedules.forEach(s => { if (keyFromDateForMethod(s.dueDate, m) === k && s.paid) { if (s.payer === "Nu") nuPaidSum += s.amount; if (s.payer === "B") bPaidSum += s.amount; } });
+        }
+      }
+      
+      owners.forEach(ownerName => {
+        if (!pD[ownerName]) pD[ownerName] = { s: 0, p: 0, rm: 0 };
+        let breakdown = getPersonItemBreakdown(x, k, ownerName);
+        pD[ownerName].s += breakdown.spent; pD[ownerName].p += breakdown.paid; pD[ownerName].rm += breakdown.remain;
+      });
+
+      const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
+      let instBadge = ""; 
+      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="event.stopPropagation(); openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
+      else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="event.stopPropagation(); openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
+      let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="event.stopPropagation(); openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
+
+      // ป้ายกำกับสถานะในรายการ
+      let statusHtml = "";
+      if (isCash) { statusHtml = `<p class="c-green" style="font-weight:600;">เงินสด ✓</p>`; } 
+      else { statusHtml = eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`; }
+
+      return `<div class="entry-card" id="card-${x.id}" onclick="openEntryDetailModal('${x.id}')">
+                <div class="entry-icon" ${x.image ? `style="cursor:pointer" onclick="event.stopPropagation(); viewImage('${x.image}')"` : ''}>${x.image ? `<img src="${x.image}">` : getIconForCategory(x.category)}</div>
+                <div class="entry-details"><h4>${esc(x.item)}</h4><p>${fmtDate(x.date)} • ${changeOwnerBtn}</p><div class="entry-meta"><span class="badge">${esc(x.method)}</span> ${orderH} ${txH} ${instBadge}</div></div>
+                <div class="entry-right" onclick="event.stopPropagation()"><button class="btn-delete-item" onclick="deleteEntry('${x.id}')" title="ลบรายการนี้">🗑️</button><h4>฿${money(eff.amount)}</h4>${statusHtml}</div>
+              </div>`;
+    }).join("");
+  } else { entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`; }
+
+  document.getElementById("entriesList").innerHTML = entriesHtml;
+  document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+  document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent); document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum); document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
+
+  let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
+  document.getElementById("personSummary").innerHTML = displayPersons.map(p => { 
+    let dat = pD[p] || { rm: 0 }; 
+    return `<div class="split-badge" onclick="openPersonDetail('${p}')"><span>👤 ${esc(p)}</span><strong style="color:${dat.rm > 0 ? '#ffdddd' : '#ffffff'}">฿${money(dat.rm)}</strong></div>`; 
+  }).join("");
+
+  let totalCalendarSpent = 0; let calendarCashSpent = 0; let calendarCreditSpent = 0; let channelSpentMap = {};
+  entries.forEach(x => {
+    let m = x.method || "CreditCard"; let isCash = (getChannelType(m) === 'cash');
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => { if (s.dueDate && s.dueDate.startsWith(k)) { totalCalendarSpent += s.amount; if (isCash) calendarCashSpent += s.amount; else calendarCreditSpent += s.amount; channelSpentMap[m] = (channelSpentMap[m] || 0) + s.amount; } });
+    } else {
+      if (x.date && x.date.startsWith(k)) { totalCalendarSpent += x.amount; if (isCash) calendarCashSpent += x.amount; else calendarCreditSpent += x.amount; channelSpentMap[m] = (channelSpentMap[m] || 0) + x.amount; }
+    }
+  });
+
+  let budgetLimit = localSettings.budgets[k] || 0; let budgetRemain = budgetLimit - totalCalendarSpent; let percent = budgetLimit > 0 ? Math.min(100, (totalCalendarSpent / budgetLimit) * 100) : 0;
+  document.getElementById("budgetText").textContent = budgetLimit > 0 ? "฿" + money(budgetLimit) : "ยังไม่ตั้ง"; document.getElementById("cycleSpentText").textContent = "฿" + money(totalCalendarSpent); document.getElementById("budgetRemainText").textContent = budgetLimit > 0 ? "฿" + money(budgetRemain) : "฿0.00"; document.getElementById("budgetProgressBar").style.width = percent + "%"; document.getElementById("budgetProgressBar").style.background = percent >= 100 ? "var(--danger)" : "#fff";
+  
+  let breakdownHtml = `<div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;"><span>💵 จ่ายด้วยเงินสด: <strong>฿${money(calendarCashSpent)}</strong></span><span>💳 รูดสินเชื่อไป: <strong>฿${money(calendarCreditSpent)}</strong></span></div>`;
+  const channels = localSettings.channels || {};
+  for (let ch in channels) {
+    let chBudget = Number(channels[ch].budget) || 0;
+    if (chBudget > 0) {
+      let spent = channelSpentMap[ch] || 0; let chPct = Math.min(100, (spent / chBudget) * 100); let barColor = chPct >= 100 ? 'var(--danger)' : 'rgba(255,255,255,0.9)';
+      breakdownHtml += `<div style="font-size:10.5px; margin-top:6px; opacity:0.9;"><div style="display:flex; justify-content:space-between; margin-bottom:2px;"><span>${ch} (ตั้งงบ ฿${money(chBudget)})</span><span>ใช้ไป ฿${money(spent)}</span></div><div style="width:100%; height:4px; background:rgba(0,0,0,0.2); border-radius:2px;"><div style="width:${chPct}%; height:100%; background:${barColor}; border-radius:2px;"></div></div></div>`;
+    }
+  }
+  document.getElementById("budgetBreakdownHtml").innerHTML = breakdownHtml;
+}
+
+function openPersonDetail(personName) {
+  const k = document.getElementById("cycleSelect").value; 
+  document.getElementById("personModalTitle").textContent = `👤 รายละเอียดของ: ${personName}`; 
+  document.getElementById("personModalSubtitle").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
+  
+  const matchedEntries = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : (keyFromDateForMethod(x.date, m) === k); 
+    let isOwnerMatch = (x.owner === personName) || ((x.owner === "Nu & B" || x.owner === "Nu and B") && (personName === "Nu" || personName === "B"));
+    return inCycle && isOwnerMatch; 
+  });
+
+  let totalSpent = 0; let totalPaid = 0; let totalRemain = 0; let methodGroups = {};
+
+  matchedEntries.forEach(x => {
+    let breakdown = getPersonItemBreakdown(x, k, personName);
+    if (breakdown.spent <= 0) return;
+    totalSpent += breakdown.spent; totalPaid += breakdown.paid; totalRemain += breakdown.remain;
+
+    let m = x.method || "CreditCard"; 
+    if(!methodGroups[m]) methodGroups[m] = { totalSpent: 0, totalRemain: 0, items: [] }; 
+    methodGroups[m].totalSpent += breakdown.spent; methodGroups[m].totalRemain += breakdown.remain;
+    methodGroups[m].items.push({ ...x, itemSpent: breakdown.spent, itemPaid: breakdown.paid, itemRemain: breakdown.remain, isCash: (getChannelType(m) === 'cash') });
+  });
+
+  let html = ""; let totalPersonItemsCount = 0; Object.values(methodGroups).forEach(mg => totalPersonItemsCount += mg.items.length);
+  if(Object.keys(methodGroups).length === 0) { html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการค่าใช้จ่าย</div>`; } 
+  else { 
+    html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">รายการทั้งหมดของ ${personName} (${totalPersonItemsCount} รายการ):</div>`;
+    for(let method in methodGroups) { 
+      let dat = methodGroups[method]; let collapseId = `person-collapse-${personName}-${method}`.replace(/\s+/g, '_');
+      html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')"><div style="display:flex; justify-content:space-between; align-items:center;"><div><strong style="font-size:15px; color:var(--primary-dark)">💳 ช่องทาง: ${esc(method)} (${dat.items.length} รายการ) 🔽</strong><div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ยอดรวมส่วนนี้: ฿${money(dat.totalSpent)}</div></div><div style="text-align:right;"><strong style="font-size:15px; color:${dat.totalRemain > 0 ? 'var(--danger)' : 'var(--primary-dark)'}">฿${money(dat.totalRemain)}</strong><div style="font-size:10.5px; color:var(--text-muted);">ค้างชำระ</div></div></div><div id="${collapseId}" class="hidden" style="margin-top:10px; border-top:1px dashed var(--shadow-dark); padding-top:8px; font-size:12.5px;" onclick="event.stopPropagation()">`;
+      dat.items.forEach(item => { 
+        let imgTag = item.image ? `<img src="${item.image}" style="width:32px; height:32px; border-radius:8px; object-fit:cover; cursor:pointer;" onclick="viewImage('${item.image}')">` : '<div style="width:32px; height:32px; border-radius:8px; background:var(--surface-white); display:flex; align-items:center; justify-content:center; font-size:14px;">🏷️</div>'; 
+        
+        let remainHtml = "";
+        if (item.isCash) { remainHtml = `<div style="font-size:11px; color:var(--primary); font-weight:600;">เงินสด ✓</div>`; } 
+        else { remainHtml = item.itemRemain > 0 ? `<div style="font-size:11px; color:var(--danger); font-weight:600; cursor:pointer; text-decoration:underline;" onclick="closePersonModal(); openRepayModal('${item.id}', '${personName}')">ค้าง ฿${money(item.itemRemain)} (ชำระ)</div>` : `<div style="font-size:11px; color:var(--primary); font-weight:600;">ครบแล้ว</div>`; }
+
+        html += `<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; background:var(--surface-white); padding:8px 10px; border-radius:10px;"><div style="display:flex; align-items:center; gap:8px;">${imgTag}<div><div style="font-size:13px; font-weight:600;">${esc(item.item)}</div><div style="font-size:10.5px; color:var(--text-muted);">${fmtDate(item.date)}</div></div></div><div style="text-align:right;"><div style="font-size:13px; font-weight:700;">฿${money(item.itemSpent)}</div>${remainHtml}</div></div>`; 
+      }); 
+      html += `</div></div>`; 
+    } 
+  }
+  document.getElementById("pModalTotal").textContent = "฿" + money(totalSpent); 
+  document.getElementById("pModalPaid").textContent = "฿" + money(totalPaid); 
+  document.getElementById("pModalRemain").textContent = "฿" + money(totalRemain); 
+  document.getElementById("personEntriesList").innerHTML = html; 
+  document.getElementById("personModal").classList.add("open");
+}
+function closePersonModal() { document.getElementById("personModal").classList.remove("open"); }
+function toggleChannelAccordion(id) { const el = document.getElementById(id); if(el) el.classList.toggle('hidden'); }
+
+// --- Utility Functions ที่เหลือ ---
+function openRepayModal(id, forcedPayer = null){ const e = entries.find(x => x.id === id); if(!e) return; curRepayId = id; currentForcedPayer = forcedPayer; const currentCycleKey = document.getElementById("cycleSelect").value; let remainDisplay = 0; if (forcedPayer) { let breakdown = getPersonItemBreakdown(e, currentCycleKey, forcedPayer); remainDisplay = breakdown.remain; } else { const eff = getEffectiveItemData(e, currentCycleKey); remainDisplay = eff.remain; } document.getElementById("repayItemName").textContent = e.item + (forcedPayer ? ` (${forcedPayer})` : ""); document.getElementById("repayRemainAmt").textContent = "฿" + money(remainDisplay); document.getElementById("repayDate").value = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}-${pad(new Date().getDate())}`; document.getElementById("repayInputAmt").value = ""; document.getElementById("repayImg").value = ""; const payerGroup = document.getElementById("repayPayerSelectGroup"); const payerSelect = document.getElementById("repayPayerSelect"); if (forcedPayer) { payerSelect.value = forcedPayer; payerGroup.style.display = "none"; } else { payerGroup.style.display = "block"; payerSelect.innerHTML = `<option value="Nu">Nu</option><option value="B">B</option><option value="Nu and B">Nu and B</option><option value="obligation">ชำระคืนตามสัดส่วนค้างจริง</option>`; } document.getElementById("repayModal").classList.add("open"); }
+function closeRepayModal(){ document.getElementById("repayModal").classList.remove("open"); curRepayId = null; currentForcedPayer = null; }
+function fillFullRepay(){ const e = entries.find(x => x.id === curRepayId); const currentCycleKey = document.getElementById("cycleSelect").value; if (currentForcedPayer) { let breakdown = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer); document.getElementById("repayInputAmt").value = breakdown.remain > 0 ? breakdown.remain.toFixed(2) : "0.00"; } else { const eff = getEffectiveItemData(e, currentCycleKey); document.getElementById("repayInputAmt").value = eff.remain > 0 ? eff.remain.toFixed(2) : "0.00"; } }
+async function confirmRepay(){ const btn = document.getElementById("btnConfirmRepay"); if(!curRepayId) return; try { const date = document.getElementById("repayDate").value; const amt = Number(document.getElementById("repayInputAmt").value); const payer = document.getElementById("repayPayerSelect").value; const e = entries.find(x => x.id === curRepayId); const currentCycleKey = document.getElementById("cycleSelect").value; if(!date || !Number.isFinite(amt) || amt <= 0){ alert("ข้อมูลไม่ถูกต้อง"); return; } if (currentForcedPayer) { let breakdown = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer); if (amt > breakdown.remain + 0.005) { alert(`❌ ไม่สามารถชำระเกินภาระหนี้ได้`); return; } } btn.textContent = "กำลังบันทึก..."; btn.disabled = true; const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file); if (e.isInstallment && e.installmentPlan) { let m = e.method || "CreditCard"; let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === currentCycleKey && !s.paid); if (targetSchedule) { targetSchedule.paid = true; targetSchedule.image = b64Img; targetSchedule.paidDate = date; targetSchedule.payer = payer; await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan }); } } else { if (payer === "obligation") { let nuBreak = getPersonItemBreakdown(e, currentCycleKey, "Nu"); let bBreak = getPersonItemBreakdown(e, currentCycleKey, "B"); let totalRemainObligation = nuBreak.remain + bBreak.remain; let newRepays = []; if (totalRemainObligation > 0) { let effectiveAmt = Math.min(amt, totalRemainObligation); let nuPay = effectiveAmt * (nuBreak.remain / totalRemainObligation); let bPay = effectiveAmt * (bBreak.remain / totalRemainObligation); if (nuPay > 0.005) newRepays.push({ id: Date.now().toString() + '_nu', date, amount: Number(nuPay.toFixed(2)), payer: "Nu", image: b64Img }); if (bPay > 0.005) newRepays.push({ id: Date.now().toString() + '_b', date, amount: Number(bPay.toFixed(2)), payer: "B", image: b64Img }); } if (newRepays.length > 0) await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(...newRepays) }); } else { const newRepay = { id: Date.now().toString(), date, amount: amt, payer: payer, image: b64Img }; await db.collection("entries").doc(curRepayId).update({ repayments: firebase.firestore.FieldValue.arrayUnion(newRepay) }); } } closeRepayModal(); } catch (err) { alert("เกิดข้อผิดพลาด"); } finally { btn.textContent = "ยืนยัน"; btn.disabled = false; } }
+
+// Miscellaneous
+function checkDueAlerts(currentCycleKey) { const banner = document.getElementById("dueAlertBanner"); const channels = localSettings.channels || {}; const currentDay = new Date().getDate(); let alerts = []; for(let method in channels) { let dueDay = Number(channels[method].due); let diff = dueDay - currentDay; if(diff >= 0 && diff <= 3) alerts.push(`ช่องทาง <b>${method}</b> ครบกำหนดชำระวันที่ ${dueDay} นี้ (เหลือ ${diff} วัน)`); } if(alerts.length > 0) { banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนกำหนดจ่ายด่วน:</strong><br>${alerts.join("<br>")}</div>`; banner.classList.remove("hidden"); } else { banner.classList.add("hidden"); } }
+function openMethodBreakdownModal() { const k = document.getElementById("cycleSelect").value; document.getElementById("methodModalCycleLabel").textContent = `อิงรอบ/เดือน: ${cycleLabel(k)}`; const channels = localSettings.channels || {}; let breakdown = {}; entries.forEach(x => { let m = x.method || "CreditCard"; let matchCycle = false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); else matchCycle = (keyFromDateForMethod(x.date, m) === k); if (matchCycle && getChannelType(m) === 'credit') { const eff = getEffectiveItemData(x, k); if(!breakdown[m]) breakdown[m] = { totalRemain: 0, totalSpent: 0, items: [] }; breakdown[m].totalRemain += eff.remain; breakdown[m].totalSpent += eff.amount; breakdown[m].items.push({ item: x.item, owner: x.owner, amount: eff.amount, remain: eff.remain }); } }); let html = ""; let allChannelsSet = new Set(Object.keys(channels).filter(ch => getChannelType(ch) === 'credit')); Object.keys(breakdown).forEach(m => allChannelsSet.add(m)); if (allChannelsSet.size === 0) { html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลสินเชื่อในรอบ/เดือนนี้</div>`; } else { allChannelsSet.forEach(method => { let dat = breakdown[method] || { totalRemain: 0, totalSpent: 0, items: [] }; let chInfo = channels[method] || defaultChannels[method] || { cutoff: 17, due: 30, budget: 0 }; let collapseId = `collapse-${method}`; let itemCount = dat.items.length; html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')"><div style="display:flex; justify-content:space-between; align-items:center;"><div><strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)} (${itemCount} รายการ) 🔽</strong><div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ตัดรอบ ${chInfo.cutoff} | จ่าย ${chInfo.due}</div></div><div style="text-align:right;"><strong style="font-size:16px; color:var(--text-main)">฿${money(dat.totalRemain)}</strong><div style="font-size:10px; color:var(--text-muted);">หนี้คงเหลือ</div></div></div><div id="${collapseId}" class="hidden" style="margin-top:10px; border-top:1px dashed var(--shadow-dark); padding-top:8px; font-size:12.5px;" onclick="event.stopPropagation()">`; if (dat.items.length === 0) { html += `<div style="text-align:center; padding:8px; color:var(--text-muted); font-size:12px;">ไม่มีรายการหนี้</div>`; } else { dat.items.forEach(i => { let statusText = i.remain > 0 ? `ค้าง ฿${money(i.remain)}` : `<span style="color:var(--primary)">ครบแล้ว ✓</span>`; html += `<div style="display:flex; justify-content:space-between; margin-bottom:6px; background:var(--surface-white); padding:6px 10px; border-radius:8px;"><span>• ${esc(i.item)} (${esc(i.owner)})</span><strong>${statusText}</strong></div>`; }); } html += `</div></div>`; }); } document.getElementById("methodBreakdownContent").innerHTML = html; document.getElementById("methodBreakdownModal").classList.add("open"); }
+function closeMethodBreakdownModal() { document.getElementById("methodBreakdownModal").classList.remove("open"); }
+let currentInstEntryId = null; function openInstallmentModal(id) { const e = entries.find(x => x.id === id); if(!e || !e.installmentPlan) return; currentInstEntryId = id; const plan = e.installmentPlan; document.getElementById("instModalTitle").textContent = `${e.item} (${plan.months} งวด)`; document.getElementById("instPerMonthVal").textContent = "฿" + money(plan.perMonth); document.getElementById("instTotalVal").textContent = "฿" + money(plan.totalToPay); let principal = Number(e.amount) || 0; let totalInterest = Number(plan.totalToPay) - principal; if(totalInterest < 0) totalInterest = 0; document.getElementById("instInterestVal").textContent = "฿" + money(totalInterest); let annualVal = Number(plan.annualInterest) || 0; if (annualVal === 0 && totalInterest > 0 && principal > 0 && plan.months > 0) annualVal = (totalInterest / principal) * (12 / plan.months) * 100; document.getElementById("instPercentVal").textContent = annualVal.toFixed(2) + "% ต่อปี"; let paidCount = plan.schedules.filter(s => s.paid).length; document.getElementById("instPaidVal").textContent = `${paidCount} งวด`; document.getElementById("instRemainVal").textContent = `${plan.months - paidCount} งวด`; renderInstSchedules(plan.schedules); document.getElementById("installmentModal").classList.add("open"); }
+function closeInstModal() { document.getElementById("installmentModal").classList.remove("open"); currentInstEntryId = null; }
+function renderInstSchedules(schedules) { let html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:8px;">ตารางงวดทั้งหมด (${schedules.length} งวด):</div><table class="report-table"><tr><th>งวด</th><th>กำหนดชำระ</th><th>ยอด (฿)</th><th>สถานะ</th><th>จัดการ</th></tr>`; schedules.forEach(s => { let slipIcon = s.image ? `<span style="cursor:pointer; margin-left:4px; font-size:14px;" onclick="viewImage('${s.image}')" title="ดูสลิป">📷</span>` : ""; html += `<tr><td><strong>งวดที่ ${s.no}</strong></td><td>${fmtDate(s.dueDate)}</td><td>฿${money(s.amount)}</td><td>${s.paid ? '<span style="color:var(--primary);">จ่ายแล้ว ✓</span>' + slipIcon : '<span style="color:var(--danger)">รอจ่าย</span>'}</td><td><button class="btn-main" style="padding:4px 8px; font-size:11px; border-radius:6px;" onclick="toggleInstPay(${s.no})">${s.paid ? 'ยกเลิก' : 'จ่ายงวดนี้'}</button></td></tr>`; }); document.getElementById("instSchedulesList").innerHTML = html + `</table>`; }
+async function toggleInstPay(no) { const e = entries.find(x => x.id === currentInstEntryId); if(!e || !e.installmentPlan) return; let plan = e.installmentPlan; plan.schedules = plan.schedules.map(s => { if(s.no === no) { let nextPaid = !s.paid; return { ...s, paid: nextPaid, image: nextPaid ? s.image : null, paidDate: nextPaid ? (s.paidDate || new Date().toISOString().split('T')[0]) : null, payer: nextPaid ? (s.payer || "Nu") : null }; } return s; }); await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); openInstallmentModal(currentInstEntryId); }
+function openBudgetModal() { const k = document.getElementById("cycleSelect").value; document.getElementById("budgetInputAmt").value = localSettings.budgets[k] || ''; document.getElementById("budgetModal").classList.add("open"); }
+function closeBudgetModal() { document.getElementById("budgetModal").classList.remove("open"); }
+function saveBudgetGoal() { const k = document.getElementById("cycleSelect").value; localSettings.budgets[k] = Number(document.getElementById("budgetInputAmt").value) || 0; saveSettingsLocal(); closeBudgetModal(); render(); }
+
+// Initialize
+function setup(){ const now = new Date(); const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("date").value = dateStr; document.getElementById("addStartDate").value = dateStr; toggleOwnerInput(); toggleTxNo(); toggleTxType(); toggleInterestInput(); }
+setup();
 </script>
-</body>
-</html>
