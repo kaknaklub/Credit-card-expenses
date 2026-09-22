@@ -93,8 +93,9 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
     <div class="balance-card">
-      <p>ยอดการใช้สินเชื่อ (รอเคลียร์)</p>
+      <p>ยอดการใช้สินเชื่อ (ต้องชำระรอบนี้ / คงค้างทั้งหมด)</p>
       <h2 id="sumOutstanding">฿0.00</h2>
+      <div id="sumTotalActiveDebt" style="font-size: 12.5px; opacity: 0.95; margin-top: -8px; margin-bottom: 12px;">ยอดหนี้คงค้างสะสมทั้งหมด: ฿0.00</div>
       
       <!-- ส่วนแสดงยอดหนี้รายบุคคล -->
       <div class="split-badges" id="personSummary"></div>
@@ -271,9 +272,9 @@ let db;
 try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (err) {}
 
 let entries = []; let userChangedCycle = false; let currentForcedPayer = null;
-const defaultChannels = { "CreditCard": { cutoff: 17, due: 30, budget: 0 }, "SPayLater": { cutoff: 25, due: 5, budget: 0 }, "Lazada": { cutoff: 20, due: 20, budget: 0 }, "ShopeePay": { cutoff: 31, due: 5, budget: 0 }, "Cash/Transfer": { cutoff: 31, due: 31, budget: 0 }, "Other": { cutoff: 31, due: 31, budget: 0 } };
-let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.9.9"));
-let localSettings = savedSettings || { budgets: {}, channels: defaultChannels };
+const defaultChannels = { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } };
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.11.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.10.0"));
+let localSettings = savedSettings || { channels: defaultChannels };
 localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
 
 function openEntryDetailModal(id) {
@@ -356,7 +357,7 @@ function openBulkRepayModal() {
   const k = document.getElementById("cycleSelect").value; if(!k) return alert("กรุณาเลือกรอบ/เดือนก่อนครับ");
   document.getElementById("bulkModalCycleLabel").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
   const es = entries.filter(x => { 
-    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; // กรองเฉพาะสินเชื่อ
+    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; 
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; 
   });
   let html = ""; let unpaidCount = 0;
@@ -409,7 +410,7 @@ function openLineShareModal() {
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; });
   let tR = 0; let pSpent = { "Nu": 0, "B": 0 }; let pRemain = { "Nu": 0, "B": 0 };
   es.forEach(x => { const eff = getEffectiveItemData(x, k); tR += eff.remain; ["Nu", "B"].forEach(p => { let b = getPersonItemBreakdown(x, k, p); pSpent[p] += b.spent; pRemain[p] += b.remain; }); });
-  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรวมทั้งหมด: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
+  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.11.0`;
   document.getElementById("lineShareTextOutput").value = text; document.getElementById("lineShareModal").classList.add("open");
 }
 function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
@@ -583,7 +584,7 @@ function getEffectiveItemData(e, selectedCycleKey) {
     let effectiveRemain = effectiveAmount - paidSchedulesSum;
     return { amount: effectiveAmount, repaid: paidSchedulesSum, remain: effectiveRemain > 0 ? effectiveRemain : 0, isInstActiveInCycle: matchingSchedules.length > 0 };
   } else { 
-    if (isCash) return { amount: 0, repaid: 0, remain: 0, isInstActiveInCycle: false }; // ตัดเงินสดออกจากการคำนวณสินเชื่อ
+    if (isCash) return { amount: 0, repaid: 0, remain: 0, isInstActiveInCycle: false };
     let r = getRepaidSum(e); let rm = e.amount - r; 
     return { amount: e.amount, repaid: r, remain: rm > 0 ? rm : 0, isInstActiveInCycle: true }; 
   }
@@ -607,7 +608,7 @@ function calculateShareBreakdown(totalAmt, shares, repayments) {
 }
 
 function getPersonItemBreakdown(x, selectedCycleKey, personName) {
-  let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return { spent: 0, paid: 0, remain: 0 }; // ตัดเงินสดออก
+  let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return { spent: 0, paid: 0, remain: 0 };
   let owners = (x.owner === "Nu & B" || x.owner === "Nu and B") ? ["Nu", "B"] : [x.owner];
   if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
   let totalSpent = 0; let totalPaid = 0; let totalRemain = 0;
@@ -677,7 +678,7 @@ function openMethodBreakdownModal() {
   const k = document.getElementById("cycleSelect").value; document.getElementById("methodModalCycleLabel").textContent = `อิงรอบ/เดือน: ${cycleLabel(k)}`;
   const channels = localSettings.channels || {}; let breakdown = {};
   entries.forEach(x => {
-    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return; // ตัดเงินสดออก
+    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return;
     let matchCycle = false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); else matchCycle = (keyFromDateForMethod(x.date, m) === k);
     if (matchCycle) { 
       const eff = getEffectiveItemData(x, k); 
@@ -690,8 +691,8 @@ function openMethodBreakdownModal() {
   let html = ""; let allChannelsSet = new Set(Object.keys(channels)); Object.keys(breakdown).forEach(m => allChannelsSet.add(m));
   if (allChannelsSet.size === 0) { html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีข้อมูลสินเชื่อในรอบ/เดือนนี้</div>`; } else { 
     allChannelsSet.forEach(method => { 
-      if (getChannelType(method) === 'cash') return; // ไม่แสดงช่องทางเงินสด
-      let dat = breakdown[method] || { totalRemain: 0, totalSpent: 0, items: [] }; let chInfo = channels[method] || defaultChannels[method] || { cutoff: 17, due: 30, budget: 0 }; let collapseId = `collapse-${method}`; let itemCount = dat.items.length;
+      if (getChannelType(method) === 'cash') return;
+      let dat = breakdown[method] || { totalRemain: 0, totalSpent: 0, items: [] }; let chInfo = channels[method] || defaultChannels[method] || { cutoff: 17, due: 30 }; let collapseId = `collapse-${method}`; let itemCount = dat.items.length;
       html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light); cursor:pointer;" onclick="toggleChannelAccordion('${collapseId}')"><div style="display:flex; justify-content:space-between; align-items:center;"><div><strong style="font-size:15px; color:var(--primary-dark)">🏷️ ${esc(method)} (${itemCount} รายการ) 🔽</strong><div style="font-size:11px; color:var(--text-muted); margin-top:2px;">ตัดรอบวันที่ ${chInfo.cutoff} | กำหนดจ่ายวันที่ ${chInfo.due}</div></div><div style="text-align:right;"><strong style="font-size:16px; color:var(--text-main)">฿${money(dat.totalRemain)}</strong><div style="font-size:10px; color:var(--text-muted);">หนี้คงเหลือ</div></div></div><div id="${collapseId}" class="hidden" style="margin-top:10px; border-top:1px dashed var(--shadow-dark); padding-top:8px; font-size:12.5px;" onclick="event.stopPropagation()">`;
       if (dat.items.length === 0) { html += `<div style="text-align:center; padding:8px; color:var(--text-muted); font-size:12px;">ไม่มีรายการในช่องทางนี้</div>`; } else {
         dat.items.forEach(i => { 
@@ -712,7 +713,7 @@ function closeMethodBreakdownModal() { document.getElementById("methodBreakdownM
 function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; document.getElementById("personModalTitle").textContent = `👤 รายละเอียดสินเชื่อของ: ${personName}`; document.getElementById("personModalSubtitle").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
   const matchedEntries = entries.filter(x => { 
-    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; // ตัดเงินสดออก
+    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false;
     let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k) : (keyFromDateForMethod(x.date, m) === k); 
     let isOwnerMatch = (x.owner === personName) || ((x.owner === "Nu & B" || x.owner === "Nu and B") && (personName === "Nu" || personName === "B")); 
     return inCycle && isOwnerMatch; 
@@ -751,8 +752,19 @@ function render(){
   
   document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
 
-  let tR = 0; let pD = { "Nu": { s: 0, p: 0, rm: 0 }, "B": { s: 0, p: 0, rm: 0 } }; 
+  let tR = 0; let totalActiveDebt = 0; let pD = { "Nu": { s: 0, p: 0, rm: 0 }, "B": { s: 0, p: 0, rm: 0 } }; 
   let sharedSpent = 0; let nuPaidSum = 0; let bPaidSum = 0; let entriesHtml = "";
+
+  // คำนวณยอดหนี้คงค้างทั้งหมดทุกรอบบิล
+  entries.forEach(x => {
+    let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return;
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => { if (!s.paid) totalActiveDebt += s.amount; });
+    } else {
+      let eff = getEffectiveItemData(x, keyFromDateForMethod(x.date, m));
+      totalActiveDebt += eff.remain;
+    }
+  });
 
   if (es.length > 0) {
     entriesHtml = es.map(x => {
@@ -784,7 +796,7 @@ function render(){
       if (isCashType) {
         rightSideStatus = `<p class="c-green" style="font-size:10.5px; opacity: 0.9;">จ่ายเงินสด/โอน ✓</p>`;
       } else {
-        rightSideStatus = eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)}</p>` : `<p class="c-green">ครบแล้ว</p>`;
+        rightSideStatus = eff.remain > 0 ? `<p class="c-red" onclick="openRepayModal('${x.id}')" style="cursor:pointer; text-decoration:underline">ค้าง ฿${money(eff.remain)} (จาก ฿${money(eff.amount)})</p>` : `<p class="c-green">ครบแล้ว (฿${money(eff.amount)})</p>`;
       }
 
       return `<div class="entry-card" id="card-${x.id}" onclick="openEntryDetailModal('${x.id}')">
@@ -803,7 +815,10 @@ function render(){
     }).join("");
   } else { entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`; }
 
-  document.getElementById("entriesList").innerHTML = entriesHtml; document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+  document.getElementById("entriesList").innerHTML = entriesHtml; 
+  document.getElementById("sumOutstanding").textContent = "฿"+money(tR);
+  document.getElementById("sumTotalActiveDebt").textContent = "ยอดหนี้คงค้างสะสมทั้งหมด: ฿" + money(totalActiveDebt);
+
   document.getElementById("sharedTotalSpent").textContent = "฿" + money(sharedSpent); document.getElementById("nuPaidSum").textContent = "฿" + money(nuPaidSum); document.getElementById("bPaidSum").textContent = "฿" + money(bPaidSum);
 
   let displayPersons = ["Nu", "B"].concat(Object.keys(pD).filter(p => p !== "Nu" && p !== "B"));
@@ -869,12 +884,12 @@ function exportToCSV() {
 
 function openSettings(){ 
   let html = ""; const channels = localSettings.channels || {}; const channelNames = ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"];
-  channelNames.forEach(ch => { let dat = channels[ch] || defaultChannels[ch] || { cutoff: 17, due: 30, budget: 0 }; let safeId = ch.replace('/', '_'); html += `<div style="background:var(--bg); padding:14px; border-radius:14px; margin-bottom:14px;"><strong>🏷️ ${ch}</strong><div style="display:flex; gap:10px; margin-top:8px;"><div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${safeId}" value="${dat.cutoff}" min="1" max="31"></div><div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${safeId}" value="${dat.due}" min="1" max="31"></div></div></div>`; });
+  channelNames.forEach(ch => { let dat = channels[ch] || defaultChannels[ch] || { cutoff: 17, due: 30 }; let safeId = ch.replace('/', '_'); html += `<div style="background:var(--bg); padding:14px; border-radius:14px; margin-bottom:14px;"><strong>🏷️ ${ch}</strong><div style="display:flex; gap:10px; margin-top:8px;"><div style="flex:1;"><label style="font-size:11px;">วันตัดรอบ</label><input type="number" id="cutoff-${safeId}" value="${dat.cutoff}" min="1" max="31"></div><div style="flex:1;"><label style="font-size:11px;">กำหนดจ่าย</label><input type="number" id="due-${safeId}" value="${dat.due}" min="1" max="31"></div></div></div>`; });
   document.getElementById("channelSettingsList").innerHTML = html; document.getElementById("settingsModal").classList.add("open"); 
 }
 function closeSettings(){ document.getElementById("settingsModal").classList.remove("open"); }
 function saveSettings(){ 
-  let newChannels = {}; ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { let safeId = ch.replace('/', '_'); newChannels[ch] = { cutoff: Number(document.getElementById(`cutoff-${safeId}`).value)||31, due: Number(document.getElementById(`due-${safeId}`).value)||31, budget: 0 }; });
+  let newChannels = {}; ["CreditCard", "SPayLater", "Lazada", "ShopeePay", "Cash/Transfer", "Other"].forEach(ch => { let safeId = ch.replace('/', '_'); newChannels[ch] = { cutoff: Number(document.getElementById(`cutoff-${safeId}`).value)||31, due: Number(document.getElementById(`due-${safeId}`).value)||31 }; });
   localSettings.channels = newChannels; saveSettingsLocal(); closeSettings(); userChangedCycle = false; refreshCycles(); render(); alert("✅ บันทึกการตั้งค่าสำเร็จ!");
 }
 function setup(){ const now = new Date(); const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; document.getElementById("date").value = dateStr; document.getElementById("addStartDate").value = dateStr; toggleOwnerInput(); toggleTxNo(); toggleTxType(); toggleInterestInput(); }
