@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Expense Master Pro V2.14.0</title>
+<title>Credit Card & Expense Master Pro V2.15.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -22,11 +22,12 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 10px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
 
-/* 🌊 วงแหวนน้ำจำลองเกจวัด */
-.ring-gauge-container { display: flex; align-items: center; gap: 16px; background: rgba(0,0,0,0.1); padding: 14px; border-radius: 20px; margin-bottom: 14px; backdrop-filter: blur(4px); }
-.ring-progress { position: relative; width: 68px; height: 68px; border-radius: 50%; background: conic-gradient(var(--primary-dark) var(--deg, 0deg), rgba(255,255,255,0.2) 0deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 3px 3px 6px rgba(0,0,0,0.15); }
-.ring-progress::after { content: ""; position: absolute; width: 52px; height: 52px; background: var(--primary); border-radius: 50%; }
-.ring-inner-text { position: relative; z-index: 2; font-size: 11px; font-weight: 700; text-align: center; color: #fff; }
+/* 🌊 วงแหวนเกจแยกแต่ละช่องทาง (CreditCard, SPayLater, Lazada) */
+.channel-gauges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; background: rgba(0,0,0,0.1); padding: 14px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
+.channel-gauge-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.ring-progress { position: relative; width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(var(--ring-color, #e26d6d) var(--deg, 0deg), rgba(255,255,255,0.25) 0deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.15); margin-bottom: 6px; }
+.ring-progress::after { content: ""; position: absolute; width: 42px; height: 42px; background: var(--primary-dark); border-radius: 50%; }
+.ring-inner-text { position: relative; z-index: 2; font-size: 10px; font-weight: 700; text-align: center; color: #fff; }
 
 /* Badge รายบุคคล */
 .split-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -95,7 +96,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Expense Master V2.14.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.15.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -103,16 +104,8 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <p>ยอดเรียกเก็บแล้ว รอเคลียร์บิล (Billed & Due)</p>
       <h2 id="sumBilledDue">฿0.00</h2>
       
-      <!-- 🌊 วงแหวนน้ำจำลองเกจวัดงบ -->
-      <div class="ring-gauge-container">
-        <div class="ring-progress" id="ringProgressGauge">
-          <div class="ring-inner-text" id="ringPercentText">0%</div>
-        </div>
-        <div style="flex: 1; overflow: hidden;">
-          <div style="font-size: 12.5px; font-weight: 600; margin-bottom: 2px;">เปรียบเทียบงบประมาณรอบนี้</div>
-          <div id="sumBudgetStatus" style="font-size: 11.5px; opacity: 0.9;">ใช้งบไปแล้ว ฿0.00 จากงบตั้งไว้ ฿0.00</div>
-        </div>
-      </div>
+      <!-- 🌊 วงแหวนเกจแยกแต่ละช่องทาง (CreditCard, SPayLater, Lazada) ด้วยสีที่ต่างกัน -->
+      <div class="channel-gauges-grid" id="channelGaugesContainer"></div>
 
       <div id="sumUnbilled" style="font-size: 12.5px; opacity: 0.95; margin-bottom: 4px;">ยอดรูดสะสม รอตัดรอบหน้า (Unbilled): ฿0.00</div>
       <div id="sumTotalActiveDebt" style="font-size: 11.5px; opacity: 0.85; margin-bottom: 12px;">ยอดหนี้คงค้างสะสมทั้งหมด: ฿0.00</div>
@@ -279,7 +272,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
 <div class="modal" id="changeOwnerModal" onclick="if(event.target===this)closeChangeOwnerModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">👥 เปลี่ยนภาระคนจ่าย</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="changeOwnerItemName">-</div><div class="input-group"><label>เลือกคนจ่ายใหม่</label><select id="newOwnerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;"><option value="Nu">Nu</option><option value="B">B</option><option value="Nu & B">Nu & B (หารคู่)</option></select></div><button class="btn-main" style="margin-top:10px;" onclick="confirmChangeOwner()">บันทึกการเปลี่ยนคนจ่าย</button><input type="hidden" id="changeOwnerEntryId"></div></div>
 <div class="modal" id="convertInstModal" onclick="if(event.target===this)closeConvertInstModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 เปลี่ยนรายการนี้เป็นยอดผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="convertInstItemName">-</div><div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="ciMonths" type="number" min="2" max="60" value="10"></div><div class="input-group"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="ciInterest" type="number" min="0" step="0.01" value="0"></div><div class="input-group"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="ciStartDate" type="date"></div><button class="btn-main" style="margin-top:10px;" onclick="confirmConvertToInstallment()">ยืนยันสร้างตารางผ่อน</button><input type="hidden" id="convertEntryId"></div></div>
 <div class="modal" id="reportModal" onclick="if(event.target===this)closeReportModal()"><div class="sheet" style="max-width: 800px; height: 88vh; padding: 22px 16px;"><div class="grabber"></div><h3 style="margin:0 0 12px; font-size:20px; text-align:center">สรุปรายการพรีเมียม</h3><div style="font-size:12.5px; color:var(--text-muted); text-align:center; margin-bottom: 12px;"><span id="reportCycleLabel"></span></div><div style="display: flex; gap: 8px; margin-bottom: 8px;"><select id="reportCategoryFilter" class="report-search" style="margin-bottom:0;" onchange="filterVisualReport()"><option value="">ทุกหมวดหมู่</option></select><select id="reportMethodFilter" class="report-search" style="margin-bottom:0;" onchange="filterVisualReport()"><option value="">ทุกช่องทาง</option></select></div><input type="text" id="reportSearchInput" class="report-search" placeholder="🔍 ค้นหา (ชื่อรายการ, ผู้จ่าย)..." oninput="filterVisualReport()"><div style="overflow-x: auto; background: var(--bg); border-radius: 16px; padding: 10px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light); max-height: 48vh;"><div id="reportContent"></div></div><button class="btn-main" style="margin-top:20px" onclick="closeReportModal()">ปิดหน้าต่างนี้</button></div></div>
-<div class="modal" id="budgetModal" onclick="if(event.target===this)closeBudgetModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">🎯 กำหนดงบประมาณ</h3><div class="input-group"><label>งบรวมสำหรับรอบบิลนี้ (บาท)</label><input id="budgetInputAmt" type="number" min="0" step="1"></div><button class="btn-main" onclick="saveBudgetGoal()">บันทึกงบประมาณ</button></div></div>
+<div class="modal" id="budgetModal" onclick="if(event.target===this)closeBudgetModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">🎯 กำหนดงบประมาณช่องทาง</h3><div style="margin-bottom:12px; font-size:12.5px; color:var(--text-muted);">กำหนดวงเงินงบประมาณ (Limit) ของแต่ละช่องทางสำหรับรอบ/เดือนนี้:</div><div id="budgetChannelsInputsList" style="max-height: 45vh; overflow-y: auto; padding-right:4px; margin-bottom:16px;"></div><button class="btn-main" onclick="saveBudgetGoal()">บันทึกงบประมาณ</button></div></div>
 <div class="modal" id="installmentModal" onclick="if(event.target===this)closeInstModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 10px; font-size:20px; text-align:center">💳 รายละเอียดการผ่อน</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="instModalTitle"></div><div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:16px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);"><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ยอดผ่อนต่อเดือน: <strong id="instPerMonthVal" style="color:var(--primary-dark)">฿0.00</strong></span><span>ยอดรวมทั้งหมด: <strong id="instTotalVal">฿0.00</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;"><span>ดอกเบี้ยรวม: <strong id="instInterestVal" style="color:var(--danger)">฿0.00</strong></span><span>อัตราดอกเบี้ย: <strong id="instPercentVal">0% ต่อปี</strong></span></div><div style="display:flex; justify-content:space-between; font-size:13px;"><span>ผ่อนไปแล้ว: <strong id="instPaidVal" style="color:var(--primary)">0 งวด</strong></span><span>คงเหลือ: <strong id="instRemainVal" style="color:var(--danger)">0 งวด</strong></span></div></div><div style="max-height: 40vh; overflow-y: auto; padding-right:4px;" id="instSchedulesList"></div><button class="btn-main" style="margin-top:20px;" onclick="closeInstModal()">ปิดหน้าต่าง</button></div></div>
 <div class="modal" id="repayModal" onclick="if(event.target===this)closeRepayModal()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 20px; font-size:20px; text-align:center">บันทึกการชำระคืน</h3><div style="background:var(--bg); border-radius:20px; padding:20px; text-align:center; margin-bottom:20px; box-shadow: inset 3px 3px 7px var(--shadow-dark), inset -3px -3px 7px var(--shadow-light);"><div style="font-size:13.5px; color:var(--text-muted); margin-bottom:6px" id="repayItemName"></div><div style="font-size:11.5px; color:var(--text-muted);">ยอดคงค้าง</div><div id="repayRemainAmt" style="font-size:30px; font-weight:700; color:var(--danger)">฿0.00</div></div><div class="input-group" id="repayPayerSelectGroup"><label>ใครเป็นคนชำระคืน?</label><select id="repayPayerSelect" style="width:100%; padding:14px; border-radius:14px; background:var(--bg); border:none;"><option value="Nu">Nu</option><option value="B">B</option><option value="Nu and B">Nu and B</option><option value="obligation">ชำระคืนตามภาระหน้าที่ของคนนั้น ๆ</option></select></div><div class="input-group"><label>วันที่โอน</label><input id="repayDate" type="date"></div><div class="input-group"><label>ยอดเงินที่โอน</label><input id="repayInputAmt" type="number" min="0" step="0.01"></div><div class="input-group"><label>📷 แนบสลิป</label><input id="repayImg" type="file" accept="image/*"></div><div style="display:flex; gap:12px; margin-top:10px"><button class="btn-main" style="flex:1; background:var(--bg); color:var(--text-main); box-shadow: 3px 3px 7px var(--shadow-dark), -3px -3px 7px var(--shadow-light);" onclick="fillFullRepay()">เติมยอดเต็ม</button><button class="btn-main" style="flex:2" onclick="confirmRepay()" id="btnConfirmRepay">ยืนยัน</button></div><input type="hidden" id="repayEntryId"></div></div>
 <div class="modal" id="settingsModal" onclick="if(event.target===this)closeSettings()"><div class="sheet"><div class="grabber"></div><h3 style="margin:0 0 15px; font-size:20px; text-align:center">⚙️ ตั้งค่ารอบบิลและงบช่องทาง</h3><div style="max-height: 55vh; overflow-y: auto; padding-right:4px;" id="channelSettingsList"></div><button class="btn-main" style="margin-top:15px;" onclick="saveSettings()">บันทึกการตั้งค่า</button></div></div>
@@ -292,8 +285,10 @@ let db;
 try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (err) {}
 
 let entries = []; let userChangedCycle = false; let currentForcedPayer = null;
+const targetChannelsList = ["CreditCard", "SPayLater", "Lazada"];
+const channelColors = { "CreditCard": "#f2994a", "SPayLater": "#eb5757", "Lazada": "#2f80ed" }; // สีโทนตัดสวยงาม
 const defaultChannels = { "CreditCard": { cutoff: 17, due: 30 }, "SPayLater": { cutoff: 25, due: 5 }, "Lazada": { cutoff: 20, due: 20 }, "ShopeePay": { cutoff: 31, due: 5 }, "Cash/Transfer": { cutoff: 31, due: 31 }, "Other": { cutoff: 31, due: 31 } };
-let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.14.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.13.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.12.0"));
+let savedSettings = JSON.parse(localStorage.getItem("cc-master-settings-v2.15.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.14.0")) || JSON.parse(localStorage.getItem("cc-master-settings-v2.13.0"));
 let localSettings = savedSettings || { channels: defaultChannels, budgets: {} };
 localSettings.channels = { ...defaultChannels, ...(localSettings.channels || {}) };
 localSettings.budgets = localSettings.budgets || {};
@@ -431,7 +426,7 @@ function openLineShareModal() {
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; });
   let tR = 0; let pSpent = { "Nu": 0, "B": 0 }; let pRemain = { "Nu": 0, "B": 0 };
   es.forEach(x => { const eff = getEffectiveItemData(x, k); tR += eff.remain; ["Nu", "B"].forEach(p => { let b = getPersonItemBreakdown(x, k, p); pSpent[p] += b.spent; pRemain[p] += b.remain; }); });
-  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.14.0`;
+  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.15.0`;
   document.getElementById("lineShareTextOutput").value = text; document.getElementById("lineShareModal").classList.add("open");
 }
 function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
@@ -512,7 +507,7 @@ async function addEntry(){
   } catch (err) { alert("เกิดข้อผิดพลาด: " + err.message); } finally { btn.textContent = "บันทึกรายการ"; btn.disabled = false; }
 }
 
-function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.14.0", JSON.stringify(localSettings)); }
+function saveSettingsLocal(){ localStorage.setItem("cc-master-settings-v2.15.0", JSON.stringify(localSettings)); }
 function money(n){ return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Math.round(n * 100) / 100); }
 function pad(n){ return String(n).padStart(2,"0"); }
 function parseDate(s){ let [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
@@ -690,9 +685,27 @@ function renderInstSchedules(schedules) {
 }
 async function toggleInstPay(no) { const e = entries.find(x => x.id === currentInstEntryId); if(!e || !e.installmentPlan) return; let plan = e.installmentPlan; plan.schedules = plan.schedules.map(s => { if(s.no === no) { let nextPaid = !s.paid; return { ...s, paid: nextPaid, image: nextPaid ? s.image : null, paidDate: nextPaid ? (s.paidDate || new Date().toISOString().split('T')[0]) : null, payer: nextPaid ? (s.payer || "Nu") : null }; } return s; }); await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); openInstallmentModal(currentInstEntryId); }
 
-function openBudgetModal() { const k = document.getElementById("cycleSelect").value; document.getElementById("budgetInputAmt").value = localSettings.budgets[k] || ''; document.getElementById("budgetModal").classList.add("open"); }
+function openBudgetModal() { 
+  const k = document.getElementById("cycleSelect").value; 
+  let budgets = localSettings.budgets[k] || {}; 
+  let html = "";
+  targetChannelsList.forEach(ch => {
+    let val = budgets[ch] !== undefined ? budgets[ch] : '';
+    html += `<div class="input-group"><label>งบสำหรับช่องทาง: <strong>${ch}</strong> (บาท)</label><input id="budget-input-${ch}" type="number" min="0" step="1" value="${val}" placeholder="0.00"></div>`;
+  });
+  document.getElementById("budgetChannelsInputsList").innerHTML = html;
+  document.getElementById("budgetModal").classList.add("open"); 
+}
 function closeBudgetModal() { document.getElementById("budgetModal").classList.remove("open"); }
-function saveBudgetGoal() { const k = document.getElementById("cycleSelect").value; localSettings.budgets[k] = Number(document.getElementById("budgetInputAmt").value) || 0; saveSettingsLocal(); closeBudgetModal(); render(); }
+function saveBudgetGoal() { 
+  const k = document.getElementById("cycleSelect").value; 
+  if(!localSettings.budgets[k]) localSettings.budgets[k] = {};
+  targetChannelsList.forEach(ch => {
+    let v = Number(document.getElementById(`budget-input-${ch}`).value) || 0;
+    localSettings.budgets[k][ch] = v;
+  });
+  saveSettingsLocal(); closeBudgetModal(); render(); 
+}
 function checkDueAlerts(currentCycleKey) { const banner = document.getElementById("dueAlertBanner"); const channels = localSettings.channels || {}; const currentDay = new Date().getDate(); let alerts = []; for(let method in channels) { let dueDay = Number(channels[method].due); let diff = dueDay - currentDay; if(diff >= 0 && diff <= 3) alerts.push(`ช่องทาง <b>${method}</b> ครบกำหนดชำระวันที่ ${dueDay} นี้ (เหลือ ${diff} วัน)`); } if(alerts.length > 0) { banner.innerHTML = `<span>🚨</span><div><strong>แจ้งเตือนกำหนดจ่ายด่วน:</strong><br>${alerts.join("<br>")}</div>`; banner.classList.remove("hidden"); } else { banner.classList.add("hidden"); } }
 
 function openMethodBreakdownModal() {
@@ -867,16 +880,43 @@ function render(){
     }).join("");
   } else { entriesHtml = `<div style="text-align:center; padding: 40px 20px;">ยังไม่มีรายการค่าใช้จ่าย</div>`; }
 
-  // คำนวณเปอร์เซ็นต์งบประมาณสำหรับวงแหวนเกจวัด
-  let cycleBudget = localSettings.budgets[k] || 0;
-  let cycleSpentTotal = 0;
-  es.forEach(x => { let eff = getEffectiveItemData(x, k); cycleSpentTotal += eff.amount; });
-  let percentUsed = cycleBudget > 0 ? Math.min(100, Math.round((cycleSpentTotal / cycleBudget) * 100)) : (cycleSpentTotal > 0 ? 100 : 0);
-  let deg = Math.round((percentUsed / 100) * 360);
+  // คำนวณยอดและเปอร์เซ็นต์งบเฉพาะ 3 ช่องทาง (CreditCard, SPayLater, Lazada)
+  let channelSpent = {};
+  targetChannelsList.forEach(ch => channelSpent[ch] = 0);
+  
+  entries.forEach(x => {
+    let m = x.method || "CreditCard";
+    if (targetChannelsList.includes(m)) {
+      let matchCycle = false;
+      if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+        matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
+      } else {
+        matchCycle = (keyFromDateForMethod(x.date, m) === k);
+      }
+      if (matchCycle) {
+        let eff = getEffectiveItemData(x, k);
+        channelSpent[m] += eff.amount;
+      }
+    }
+  });
 
-  document.getElementById("ringProgressGauge").style.setProperty('--deg', `${deg}deg`);
-  document.getElementById("ringPercentText").textContent = `${percentUsed}%`;
-  document.getElementById("sumBudgetStatus").textContent = cycleBudget > 0 ? `ใช้งบไปแล้ว ฿${money(cycleSpentTotal)} จากงบ ฿${money(cycleBudget)}` : `ใช้งบไปแล้ว ฿${money(cycleSpentTotal)} (ยังไม่ตั้งงบ)`;
+  let budgets = localSettings.budgets[k] || {};
+  let gaugesHtml = targetChannelsList.map(ch => {
+    let spent = channelSpent[ch] || 0;
+    let budget = budgets[ch] || 0;
+    let pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : (spent > 0 ? 100 : 0);
+    let deg = Math.round((pct / 100) * 360);
+    let ringColor = channelColors[ch] || '#e26d6d';
+    return `<div class="channel-gauge-item">
+              <div class="ring-progress" style="--deg: ${deg}deg; --ring-color: ${ringColor};">
+                <div class="ring-inner-text">${pct}%</div>
+              </div>
+              <div style="font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;">${ch}</div>
+              <div style="font-size: 9.5px; opacity: 0.85;">฿${money(spent)}</div>
+            </div>`;
+  }).join("");
+
+  document.getElementById("channelGaugesContainer").innerHTML = gaugesHtml;
 
   document.getElementById("entriesList").innerHTML = entriesHtml; 
   document.getElementById("sumBilledDue").textContent = "฿" + money(totalBilledDue);
