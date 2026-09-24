@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Expense Master Pro V2.22.0</title>
+<title>Credit Card & Expense Master Pro V2.23.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -22,12 +22,16 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 .balance-card p { margin: 0; font-size: 13px; opacity: 0.9; }
 .balance-card h2 { margin: 4px 0 10px; font-size: 32px; font-weight: 700; letter-spacing: -1px; }
 
-.channel-gauges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; background: rgba(0,0,0,0.1); padding: 14px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
+.channel-gauges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; background: rgba(0,0,0,0.1); padding: 12px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
 .channel-gauge-item { display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; transition: transform 0.1s; }
 .channel-gauge-item:active { transform: scale(0.95); }
-.ring-progress { position: relative; width: 56px; height: 56px; border-radius: 50%; background: conic-gradient(var(--ring-color, #e26d6d) var(--deg, 0deg), rgba(255,255,255,0.25) 0deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.15); margin-bottom: 6px; }
-.ring-progress::after { content: ""; position: absolute; width: 42px; height: 42px; background: var(--primary-dark); border-radius: 50%; }
-.ring-inner-text { position: relative; z-index: 2; font-size: 10px; font-weight: 700; text-align: center; color: #fff; }
+.ring-progress { position: relative; width: 52px; height: 52px; border-radius: 50%; background: conic-gradient(var(--ring-color, #e26d6d) var(--deg, 0deg), rgba(255,255,255,0.25) 0deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.15); margin-bottom: 4px; }
+.ring-progress::after { content: ""; position: absolute; width: 38px; height: 38px; background: var(--primary-dark); border-radius: 50%; }
+.ring-inner-text { position: relative; z-index: 2; font-size: 9.5px; font-weight: 700; text-align: center; color: #fff; }
+
+.channel-dropdown-bar { background: rgba(255,255,255,0.2); padding: 12px 16px; border-radius: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; backdrop-filter: blur(4px); cursor: pointer; transition: background 0.2s; border: 1px solid rgba(255,255,255,0.15); }
+.channel-dropdown-bar:active { background: rgba(255,255,255,0.35); }
+.channel-dropdown-bar span { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 
 .split-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .split-badge { background: rgba(255,255,255,0.2); padding: 9px 14px; border-radius: 14px; flex: 1; min-width: 110px; backdrop-filter: blur(4px); cursor: pointer; border: 1px solid transparent; transition: background 0.2s; }
@@ -92,18 +96,24 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Expense Master V2.22.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.23.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
     
-    <!-- กล่องที่ 1: ยอดเรียกเก็บแล้ว (Billed & Due) พร้อมเกจเช็คหนี้ตามช่องทาง และคลิกดูรายการย่อยแต่ละช่องทางได้ -->
+    <!-- กล่องที่ 1: ยอดเรียกเก็บแล้ว (Billed & Due) พร้อมเกจเช็คหนี้ + แถบกดดูยอดแยกตามช่องทางสินเชื่อ -->
     <div class="balance-card">
       <p>ยอดเรียกเก็บแล้ว รอเคลียร์บิล (Billed & Due)</p>
       <h2 id="sumBilledDue">฿0.00</h2>
       
-      <!-- เกจเช็คหนี้ตามช่องทาง (คลิกที่ช่องทางเพื่อเปิดดูรายการย่อยที่ใช้ไปได้ทันที) -->
+      <!-- เกจเช็คหนี้ตามช่องทาง -->
       <div class="channel-gauges-grid" id="channelGaugesContainer"></div>
+
+      <!-- แถบกดดูยอดแยกตามช่องทางสินเชื่อ (ตามแบบในรูป) -->
+      <div class="channel-dropdown-bar" onclick="openChannelDebtMasterList()">
+        <span>💳 ยอดแยกตามช่องทางสินเชื่อ</span>
+        <span>▼</span>
+      </div>
 
       <div id="sumUnbilled" style="font-size: 12.5px; opacity: 0.95; margin-bottom: 4px;">ยอดรูดสะสม รอตัดรอบหน้า (Unbilled): ฿0.00</div>
       <div id="sumTotalActiveDebt" style="font-size: 11.5px; opacity: 0.85; margin-bottom: 12px;">ยอดหนี้คงค้างสะสมทั้งหมด: ฿0.00</div>
@@ -111,7 +121,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       <div class="split-badges" id="personSummary"></div>
     </div>
 
-    <!-- กล่องที่ 2: ภาพรวมรายจ่ายและงบประมาณ (พร้อมกราฟวงกลมใหญ่ด้านขวา) -->
+    <!-- กล่องที่ 2: ภาพรวมรายจ่ายและงบประมาณ -->
     <div style="background: var(--surface-white); border-radius: 22px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h3 style="margin: 0; font-size: 16px; color: var(--text-main);">📊 ภาพรวมรายจ่ายและงบประมาณ</h3>
@@ -269,7 +279,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   </nav>
 </div>
 
-<!-- Modal แสดงรายการหนี้แยกตามช่องทาง (เมื่อกดคลิกที่เกจช่องทางด้านบน) -->
+<!-- Modal แสดงรายการหนี้แยกตามช่องทาง (เมื่อกดแถบ "ยอดแยกตามช่องทางสินเชื่อ") -->
 <div class="modal" id="channelDebtModal" onclick="if(event.target===this)closeChannelDebtModal()"><div class="sheet" style="max-width: 600px;"><div class="grabber"></div><h3 style="margin:0 0 6px; font-size:20px; text-align:center" id="chanDebtTitle">รายละเอียดหนี้ตามช่องทาง</h3><div style="font-size:13px; color:var(--text-muted); text-align:center; margin-bottom:16px;" id="chanDebtSubtitle"></div><div style="max-height: 50vh; overflow-y: auto; padding-right:4px;" id="chanDebtContent"></div><button class="btn-main" style="margin-top:20px;" onclick="closeChannelDebtModal()">ปิดหน้าต่าง</button></div></div>
 
 <!-- Modal แสดงรายการแยกตามประเภท (เงินสด/โอน หรือ สินเชื่อทุกช่องทาง) -->
@@ -472,7 +482,7 @@ function openLineShareModal() {
   const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k); return keyFromDateForMethod(x.date, m) === k; });
   let tR = 0; let pSpent = { "Nu": 0, "B": 0 }; let pRemain = { "Nu": 0, "B": 0 };
   es.forEach(x => { const eff = getEffectiveItemData(x, k); tR += eff.remain; ["Nu", "B"].forEach(p => { let b = getPersonItemBreakdown(x, k, p); pSpent[p] += b.spent; pRemain[p] += b.remain; }); });
-  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.22.0`;
+  let text = `📢 สรุปยอดสินเชื่อรอบ/เดือน (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.23.0`;
   document.getElementById("lineShareTextOutput").value = text; document.getElementById("lineShareModal").classList.add("open");
 }
 function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
@@ -753,61 +763,67 @@ function renderInstSchedules(schedules) {
 }
 async function toggleInstPay(no) { const e = entries.find(x => x.id === currentInstEntryId); if(!e || !e.installmentPlan) return; let plan = e.installmentPlan; plan.schedules = plan.schedules.map(s => { if(s.no === no) { let nextPaid = !s.paid; return { ...s, paid: nextPaid, image: nextPaid ? s.image : null, paidDate: nextPaid ? (s.paidDate || new Date().toISOString().split('T')[0]) : null, payer: nextPaid ? (s.payer || "Nu") : null }; } return s; }); await db.collection("entries").doc(currentInstEntryId).update({ installmentPlan: plan }); openInstallmentModal(currentInstEntryId); }
 
-// ฟังก์ชันคลิกดูรายละเอียดหนี้รายช่องทาง (เมื่อกดที่เกจช่องทางด้านบน)
-function openChannelDebtDetail(chName) {
+// ฟังก์ชันเปิด Modal รายการหนี้ตามช่องทาง (เมื่อกดแถบ "💳 ยอดแยกตามช่องทางสินเชื่อ")
+function openChannelDebtMasterList() {
   const k = document.getElementById("cycleSelect").value;
-  document.getElementById("chanDebtTitle").textContent = `💳 รายการหนี้ช่องทาง: ${chName}`;
+  document.getElementById("chanDebtTitle").textContent = "💳 ยอดแยกตามช่องทางสินเชื่อ";
   document.getElementById("chanDebtSubtitle").textContent = `รอบ/เดือน: ${cycleLabel(k)}`;
 
-  const matched = entries.filter(x => {
+  let channelGroups = {};
+  targetChannelsList.forEach(ch => channelGroups[ch] = { total: 0, items: [] });
+
+  entries.forEach(x => {
     let m = x.method || "CreditCard";
-    if (m !== chName) return false;
-    if (getChannelType(m) === 'cash') return false;
+    if (!channelGroups[m]) channelGroups[m] = { total: 0, items: [] };
+    if (getChannelType(m) === 'cash') return;
+
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      return x.installmentPlan.schedules.some(s => keyFromDateForMethod(s.dueDate, m) === k);
+      x.installmentPlan.schedules.forEach(s => {
+        if (keyFromDateForMethod(s.dueDate, m) === k) {
+          channelGroups[m].total += s.amount;
+          channelGroups[m].items.push({ item: `${x.item} (งวด ${s.no}/${x.installmentPlan.months})`, amount: s.amount, date: s.dueDate, paid: s.paid });
+        }
+      });
+    } else {
+      if (keyFromDateForMethod(x.date, m) === k) {
+        let eff = getEffectiveItemData(x, k);
+        if (eff.amount > 0) {
+          channelGroups[m].total += eff.amount;
+          channelGroups[m].items.push({ item: x.item, amount: eff.amount, date: x.date, paid: eff.remain === 0 });
+        }
+      }
     }
-    return keyFromDateForMethod(x.date, m) === k;
   });
 
   let html = "";
-  let totalChanBilled = 0;
-
-  if (matched.length === 0) {
-    html = `<div style="text-align:center; padding:20px; color:var(--text-muted);">ไม่มีรายการหนี้ในช่องทางนี้สำหรับรอบ/เดือนนี้</div>`;
-  } else {
-    html = `<div style="font-size:12.5px; color:var(--text-muted); margin-bottom:10px;">รายการทั้งหมดในช่องทาง ${chName} (${matched.length} รายการ):</div>`;
-    matched.forEach(x => {
-      let m = x.method || "CreditCard";
-      let eff = getEffectiveItemData(x, k);
-      let isBilledDue = isItemBilledAndDueToday(x.date, m);
-      if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-        let sched = x.installmentPlan.schedules.find(s => keyFromDateForMethod(s.dueDate, m) === k);
-        if (sched) {
-          let today = new Date();
-          let sDate = parseDate(sched.dueDate);
-          isBilledDue = today.getTime() >= sDate.getTime();
-        }
-      }
-
-      if (eff.remain > 0) {
-        totalChanBilled += eff.remain;
-      }
-
-      let statusBadge = isBilledDue 
-        ? `<span class="badge" style="background:#fdf2f2; color:var(--danger)">เรียกเก็บแล้ว (Billed)</span>` 
-        : `<span class="badge" style="background:#eef5f0; color:var(--primary)">รอตัดรอบ (Unbilled)</span>`;
-
-      html += `<div style="background:var(--bg); border-radius:14px; padding:12px; margin-bottom:10px; box-shadow:inset 2px 2px 5px var(--shadow-dark);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <strong style="font-size:14px;">${esc(x.item)}</strong>
-          <span style="font-size:14px; font-weight:700; color:var(--danger);">฿${money(eff.amount)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11.5px; color:var(--text-muted);">
-          <span>📅 ${fmtDate(x.date)} • ผู้จ่าย: ${esc(x.owner)}</span>
-          ${statusBadge}
-        </div>
+  for (let ch in channelGroups) {
+    let dat = channelGroups[ch];
+    let chColor = channelColors[ch] || '#5e8469';
+    html += `<div style="background:var(--bg); border-radius:16px; padding:14px; margin-bottom:14px; box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="font-size:15px; color:${chColor}">🏷️ ช่องทาง: ${ch} (${dat.items.length} รายการ)</strong>
+        <strong style="font-size:16px; color:var(--text-main);">฿${money(dat.total)}</strong>
       </div>`;
-    });
+    
+    if (dat.items.length === 0) {
+      html += `<div style="font-size:12px; color:var(--text-muted); padding:4px 0;">ไม่มีรายการในช่องทางนี้</div>`;
+    } else {
+      html += `<div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">`;
+      dat.items.forEach(i => {
+        html += `<div style="background:var(--surface-white); padding:8px 10px; border-radius:10px; display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+          <div>
+            <strong>${esc(i.item)}</strong>
+            <div style="font-size:10.5px; color:var(--text-muted);">${fmtDate(i.date)}</div>
+          </div>
+          <div style="text-align:right;">
+            <strong>฿${money(i.amount)}</strong>
+            <div style="font-size:10px; color:${i.paid ? 'var(--primary)' : 'var(--danger)'}">${i.paid ? 'จ่ายแล้ว' : 'ค้างชำระ'}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
   }
 
   document.getElementById("chanDebtContent").innerHTML = html;
@@ -1068,7 +1084,7 @@ function render(){
     }
   });
 
-  // เรนเดอร์เกจหนี้ตามช่องทางในกล่องที่ 1 (พร้อมคลิกเปิดดูรายการย่อยของช่องทางนั้นๆ ได้ทันที)
+  // เรนเดอร์เกจหนี้ตามช่องทางในกล่องที่ 1
   let channelGaugesHtml = "";
   targetChannelsList.forEach(ch => {
     let chBilled = channelBilledDue[ch] || 0;
@@ -1077,12 +1093,12 @@ function render(){
     let chDeg = Math.round((chPct / 100) * 360);
     let chColor = channelColors[ch] || '#e26d6d';
 
-    channelGaugesHtml += `<div class="channel-gauge-item" onclick="openChannelDebtDetail('${ch}')">
+    channelGaugesHtml += `<div class="channel-gauge-item" onclick="openChannelDebtMasterList()">
       <div class="ring-progress" style="--deg: ${chDeg}deg; --ring-color: ${chColor};">
         <div class="ring-inner-text">${chPct}%</div>
       </div>
-      <span style="font-size: 11px; font-weight: 600; opacity: 0.9;">${ch} ▶</span>
-      <span style="font-size: 10px; opacity: 0.8;">฿${money(chBilled)}</span>
+      <span style="font-size: 10.5px; font-weight: 600; opacity: 0.9;">${ch}</span>
+      <span style="font-size: 9.5px; opacity: 0.8;">฿${money(chBilled)}</span>
     </div>`;
   });
   document.getElementById("channelGaugesContainer").innerHTML = channelGaugesHtml;
