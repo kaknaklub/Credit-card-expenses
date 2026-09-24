@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Credit Card & Expense Master Pro V2.21.0</title>
+<title>Credit Card & Expense Master Pro V2.22.0</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
@@ -94,7 +94,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
   <!-- ================= VIEW: HOME ================= -->
   <div id="view-home">
     <div class="header-top">
-      <div><p>Credit Card & Expense Master V2.21.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
+      <div><p>Credit Card & Expense Master V2.22.0</p><h1 style="color:var(--text-main);">แชร์ค่าใช้จ่าย</h1></div>
       <button class="btn-icon" onclick="openSettings()">⚙️</button>
     </div>
     <div id="dueAlertBanner" class="hidden"></div>
@@ -241,7 +241,7 @@ input, select, textarea { width: 100%; padding: 14px; border: none; border-radiu
       </div>
       <div class="input-group" id="interestPercentContainer"><label>อัตราดอกเบี้ยต่อปี (%)</label><input id="addInterestPercent" type="number" min="0" step="0.01" value="0" oninput="onPercentInput()"></div>
       <div class="input-group hidden" id="interestBahtContainer"><label>ยอดดอกเบี้ยรวมตลอดสัญญา (บาท)</label><input id="addInterestBaht" type="number" min="0" step="0.01" value="0" oninput="onBahtInput()"></div>
-      <div class="input-group" style="margin-bottom:0;"><label>วันที่เริ่มผ่อนงวดแรก</label><input id="addStartDate" type="date" onchange="checkCalendarBudgetOnDateChange()"></div>
+      <div class="input-group" style="margin-bottom:0;"><label>วันที่กำหนดจ่ายงวดแรก (dueDate)</label><input id="addStartDate" type="date" onchange="checkCalendarBudgetOnDateChange()"></div>
     </div>
     <div id="txNoContainer" class="hidden">
       <div class="input-group"><label>🛒 Order No.</label><input id="orderNo" type="text" placeholder="หมายเลขคำสั่งซื้อ"></div>
@@ -349,7 +349,11 @@ function closeEntryDetailModal() { document.getElementById("entryDetailModal").c
 let cachedPaymentHistoryItems = [];
 function openPaymentHistoryModal() {
   const k = document.getElementById("cycleSelect").value; if(!k) return alert("กรุณาเลือกรอบบิลก่อนครับ");
-  const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k); return keyFromDateForBillingCycle(x.date, m) === k; });
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k); 
+    return keyFromDateForBillingCycle(x.date, m) === k; 
+  });
   cachedPaymentHistoryItems = []; let totalHistAmt = 0; let payerSummary = {};
   es.forEach(x => {
     let m = x.method || "CreditCard";
@@ -363,7 +367,7 @@ function openPaymentHistoryModal() {
     }
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => {
-        if (keyFromDateForBillingCycle(s.dueDate, m) === k && s.paid) {
+        if (s.dueDate && s.dueDate.substring(0, 7) === k && s.paid) {
           totalHistAmt += s.amount; let p = s.payer || "ทั่วไป"; payerSummary[p] = (payerSummary[p] || 0) + s.amount;
           cachedPaymentHistoryItems.push({ type: 'installment', entryId: x.id, scheduleNo: s.no, itemName: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`, method: m, date: s.paidDate || s.dueDate, amount: s.amount, payer: s.payer, image: s.image });
         }
@@ -406,7 +410,8 @@ function openBulkRepayModal() {
   document.getElementById("bulkModalCycleLabel").textContent = `รอบบิล: ${cycleLabel(k)}`;
   const es = entries.filter(x => { 
     let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; 
-    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k); return keyFromDateForBillingCycle(x.date, m) === k; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k); 
+    return keyFromDateForBillingCycle(x.date, m) === k; 
   });
   let html = ""; let unpaidCount = 0;
   es.forEach(x => {
@@ -434,7 +439,7 @@ async function confirmBulkRepay() {
     for (let cb of checkboxes) {
       let id = cb.getAttribute('data-id'); let e = entries.find(x => x.id === id); if(!e) continue;
       if (e.isInstallment && e.installmentPlan) {
-        let m = e.method || "CreditCard"; let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForBillingCycle(s.dueDate, m) === currentCycleKey && !s.paid);
+        let targetSchedule = e.installmentPlan.schedules.find(s => s.dueDate && s.dueDate.substring(0, 7) === currentCycleKey && !s.paid);
         if (targetSchedule) { targetSchedule.paid = true; targetSchedule.image = finalSlip; targetSchedule.paidDate = date; targetSchedule.payer = payer; await db.collection("entries").doc(id).update({ installmentPlan: e.installmentPlan }); }
       } else {
         if (payer === "obligation") {
@@ -455,10 +460,10 @@ async function confirmBulkRepay() {
 
 function openLineShareModal() {
   const k = document.getElementById("cycleSelect").value;
-  const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k); return keyFromDateForBillingCycle(x.date, m) === k; });
+  const es = entries.filter(x => { let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k); return keyFromDateForBillingCycle(x.date, m) === k; });
   let tR = 0; let pSpent = { "Nu": 0, "B": 0 }; let pRemain = { "Nu": 0, "B": 0 };
   es.forEach(x => { const eff = getEffectiveItemData(x, k); tR += eff.remain; ["Nu", "B"].forEach(p => { let b = getPersonItemBreakdown(x, k, p); pSpent[p] += b.spent; pRemain[p] += b.remain; }); });
-  let text = `📢 สรุปยอดสินเชื่อรอบบิล (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.21.0`;
+  let text = `📢 สรุปยอดสินเชื่อรอบบิล (${cycleLabel(k)})\n━━━━━━━━━━━━━━━\n💰 ยอดค้างรอบนี้: ฿${money(tR)}\n\n👤 หนี้สินเชื่อของ Nu: ฿${money(pRemain["Nu"])} (ใช้ไป ฿${money(pSpent["Nu"])})\n👤 หนี้สินเชื่อของ B: ฿${money(pRemain["B"])} (ใช้ไป ฿${money(pSpent["B"])})\n━━━━━━━━━━━━━━━\n✨ บันทึกผ่าน Credit Card & Expense Master Pro V2.22.0`;
   document.getElementById("lineShareTextOutput").value = text; document.getElementById("lineShareModal").classList.add("open");
 }
 function closeLineShareModal() { document.getElementById("lineShareModal").classList.remove("open"); }
@@ -635,23 +640,18 @@ function getChannelDue(method) {
   return Number(ch.due) || 2;
 }
 
-// คำนวณรอบบิลจริงตาม วันตัดรอบ (Cutoff) และ วันกำหนดจ่าย (Due)
 function keyFromDateForBillingCycle(dateStr, method) {
   const d = parseDate(dateStr);
   if (getChannelType(method) === 'cash') {
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
   } else {
     const cutoff = getChannelCutoff(method);
-    const due = getChannelDue(method);
-    // ถ้ารูดหลังวันตัดรอบ (เช่น ตัดรอบ 17 รูด 18) จะไปบิลรอบถัดไป
     let billYear = d.getFullYear();
     let billMonth = d.getMonth() + 1;
     if (d.getDate() > cutoff) {
       billMonth += 1;
       if (billMonth > 12) { billMonth = 1; billYear += 1; }
     }
-    // กำหนดจ่ายจะไปตกในเดือน Due (ถ้า due น้อยกว่า cutoff หรือข้ามเดือน)
-    // สำหรับตั้งค่ามาตรฐาน (Cutoff 17, Due วันที่ 2 ของเดือนถัดไป)
     let dueMonth = billMonth + 1;
     let dueYear = billYear;
     if (dueMonth > 12) { dueMonth = 1; dueYear += 1; }
@@ -667,7 +667,14 @@ function cycleLabel(k){
 
 function allKeys(){ 
   let keysSet = new Set(); const nowKey = `${new Date().getFullYear()}-${pad(new Date().getMonth()+1)}`; keysSet.add(nowKey); 
-  entries.forEach(x => { let m = x.method || "CreditCard"; if(x.date) keysSet.add(keyFromDateForBillingCycle(x.date, m)); if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) { x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(keyFromDateForBillingCycle(s.dueDate, m)); }); } }); 
+  entries.forEach(x => { 
+    let m = x.method || "CreditCard"; 
+    if(x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      x.installmentPlan.schedules.forEach(s => { if(s.dueDate) keysSet.add(s.dueDate.substring(0, 7)); });
+    } else {
+      if(x.date) keysSet.add(keyFromDateForBillingCycle(x.date, m)); 
+    }
+  }); 
   return Array.from(keysSet).sort().reverse(); 
 }
 
@@ -705,7 +712,7 @@ let curRepayId = null; function getRepaidSum(e) { return e.repayments ? e.repaym
 function getEffectiveItemData(e, selectedCycleKey) {
   let m = e.method || "CreditCard"; let isCash = getChannelType(m) === 'cash';
   if (e.isInstallment && e.installmentPlan && e.installmentPlan.schedules) {
-    let matchingSchedules = e.installmentPlan.schedules.filter(s => keyFromDateForBillingCycle(s.dueDate, m) === selectedCycleKey);
+    let matchingSchedules = e.installmentPlan.schedules.filter(s => s.dueDate && s.dueDate.substring(0, 7) === selectedCycleKey);
     let effectiveAmount = matchingSchedules.reduce((sum, s) => sum + s.amount, 0);
     let paidSchedulesSum = matchingSchedules.filter(s => s.paid).reduce((sum, s) => sum + s.amount, 0);
     if (isCash) paidSchedulesSum = effectiveAmount; 
@@ -741,7 +748,7 @@ function getPersonItemBreakdown(x, selectedCycleKey, personName) {
   if (!owners.includes(personName)) return { spent: 0, paid: 0, remain: 0 };
   let totalSpent = 0; let totalPaid = 0; let totalRemain = 0;
   if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-    let matchingSchedules = x.installmentPlan.schedules.filter(s => keyFromDateForBillingCycle(s.dueDate, m) === selectedCycleKey);
+    let matchingSchedules = x.installmentPlan.schedules.filter(s => s.dueDate && s.dueDate.substring(0, 7) === selectedCycleKey);
     matchingSchedules.forEach(s => { let scheduleTotal = s.amount; let shares = {}; owners.forEach(o => { shares[o] = getShareForPerson(x, scheduleTotal, o); }); let scheduleRepayments = []; if (s.paid) { scheduleRepayments.push({ amount: scheduleTotal, payer: s.payer || x.owner, image: s.image }); } let breakdown = calculateShareBreakdown(scheduleTotal, shares, scheduleRepayments); totalSpent += breakdown[personName].spent; totalPaid += breakdown[personName].paid; totalRemain += breakdown[personName].remain; });
   } else {
     let cycleKey = keyFromDateForBillingCycle(x.date, m);
@@ -768,7 +775,7 @@ async function confirmRepay(){
     if (currentForcedPayer) { let bd = getPersonItemBreakdown(e, currentCycleKey, currentForcedPayer); if (amt > bd.remain + 0.005) { alert(`❌ ไม่สามารถชำระเกินภาระหนี้ของตนเองได้`); return; } }
     btn.textContent = "กำลังบันทึก..."; btn.disabled = true; const file = document.getElementById("repayImg").files[0]; const b64Img = await compressImage(file);
     if (e.isInstallment && e.installmentPlan) { 
-      let m = e.method || "CreditCard"; let targetSchedule = e.installmentPlan.schedules.find(s => keyFromDateForBillingCycle(s.dueDate, m) === currentCycleKey && !s.paid); 
+      let targetSchedule = e.installmentPlan.schedules.find(s => s.dueDate && s.dueDate.substring(0, 7) === currentCycleKey && !s.paid); 
       if (targetSchedule) { targetSchedule.paid = true; targetSchedule.image = b64Img; targetSchedule.paidDate = date; targetSchedule.payer = payer; await db.collection("entries").doc(curRepayId).update({ installmentPlan: e.installmentPlan }); } 
     } else {
       if (payer === "obligation") {
@@ -857,7 +864,7 @@ function openMethodBreakdownModal() {
   const channels = localSettings.channels || {}; let breakdown = {};
   entries.forEach(x => {
     let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return;
-    let matchCycle = false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) matchCycle = x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k); else matchCycle = (keyFromDateForBillingCycle(x.date, m) === k);
+    let matchCycle = false; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) matchCycle = x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k); else matchCycle = (keyFromDateForBillingCycle(x.date, m) === k);
     if (matchCycle) { 
       const eff = getEffectiveItemData(x, k); 
       if(!breakdown[m]) breakdown[m] = { totalRemain: 0, totalSpent: 0, items: [] }; 
@@ -889,7 +896,7 @@ function openPersonDetail(personName) {
   const k = document.getElementById("cycleSelect").value; document.getElementById("personModalTitle").textContent = `👤 รายละเอียดสินเชื่อของ: ${personName}`; document.getElementById("personModalSubtitle").textContent = `รอบบิล: ${cycleLabel(k)}`;
   const matchedEntries = entries.filter(x => { 
     let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return false;
-    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k) : (keyFromDateForBillingCycle(x.date, m) === k); 
+    let inCycle = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k) : (keyFromDateForBillingCycle(x.date, m) === k); 
     let isOwnerMatch = (x.owner === personName) || ((x.owner === "Nu & B" || x.owner === "Nu and B") && (personName === "Nu" || personName === "B")); 
     return inCycle && isOwnerMatch; 
   });
@@ -917,17 +924,23 @@ function openPersonDetail(personName) {
 }
 function closePersonModal() { document.getElementById("personModal").classList.remove("open"); }
 
-// ตรรกะเช็กว่ารายการนี้ตรงกับรอบบิลที่เลือกดูหรือไม่
-function isScheduleInCurrentCycle(dueDateStr, method, selectedCycleKey) {
-  let scheduleKey = keyFromDateForBillingCycle(dueDateStr, method);
-  return scheduleKey === selectedCycleKey;
+function isScheduleInCurrentCycle(dueDateStr, selectedCycleKey) {
+  if (!dueDateStr) return false;
+  return dueDateStr.substring(0, 7) === selectedCycleKey;
 }
 
 function render(){
   if(document.getElementById("cycleSelect").options.length === 0) refreshCycles(); const k = document.getElementById("cycleSelect").value;
   if(document.getElementById("cycleSelect").options.length > 0) document.getElementById("cycleLabelText").textContent = document.getElementById("cycleSelect").options[document.getElementById("cycleSelect").selectedIndex].text;
   checkDueAlerts(k);
-  const es = entries.filter(x => { let m = x.method || "CreditCard"; if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) return x.installmentPlan.schedules.some(s => keyFromDateForBillingCycle(s.dueDate, m) === k); return keyFromDateForBillingCycle(x.date, m) === k; }).sort((a,b)=>b.date.localeCompare(a.date));
+  
+  const es = entries.filter(x => { 
+    let m = x.method || "CreditCard"; 
+    if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+      return x.installmentPlan.schedules.some(s => s.dueDate && s.dueDate.substring(0, 7) === k);
+    }
+    return keyFromDateForBillingCycle(x.date, m) === k; 
+  }).sort((a,b)=>b.date.localeCompare(a.date));
   
   document.getElementById("entryCountBadge").textContent = `(${es.length} รายการ)`;
 
@@ -938,15 +951,11 @@ function render(){
   entries.forEach(x => {
     let m = x.method || "CreditCard"; if (getChannelType(m) === 'cash') return;
     
-    let cycleKeyOfItem = x.isInstallment && x.installmentPlan && x.installmentPlan.schedules ? 
-        (x.installmentPlan.schedules.find(s => !s.paid)?.dueDate ? keyFromDateForBillingCycle(x.installmentPlan.schedules.find(s => !s.paid).dueDate, m) : k) : 
-        keyFromDateForBillingCycle(x.date, m);
-
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => {
         if (!s.paid) {
           totalActiveDebt += s.amount;
-          if (isScheduleInCurrentCycle(s.dueDate, m, k)) {
+          if (isScheduleInCurrentCycle(s.dueDate, k)) {
             totalBilledDue += s.amount;
           } else {
             totalUnbilled += s.amount;
@@ -954,6 +963,7 @@ function render(){
         }
       });
     } else {
+      let cycleKeyOfItem = keyFromDateForBillingCycle(x.date, m);
       let eff = getEffectiveItemData(x, cycleKeyOfItem);
       if (eff.remain > 0) {
         totalActiveDebt += eff.remain;
@@ -980,7 +990,7 @@ function render(){
 
       const orderH = x.orderNo ? `<span class="badge">Ord: ${esc(x.orderNo)}</span>` : ""; const txH = x.transactionNo ? `<span class="badge">Tx: ${esc(x.transactionNo)}</span>` : "";
       let instBadge = ""; 
-      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => keyFromDateForBillingCycle(s.dueDate, m) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="event.stopPropagation(); openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
+      if(x.isInstallment) { let matchedS = x.installmentPlan.schedules.find(s => s.dueDate && s.dueDate.substring(0, 7) === k); let periodText = matchedS ? ` (งวดที่ ${matchedS.no}/${x.installmentPlan.months})` : ""; instBadge = `<span class="badge badge-installment" style="cursor:pointer;" onclick="event.stopPropagation(); openInstallmentModal('${x.id}')">💳 ผ่อนชำระ${periodText} ℹ️</span>`; }
       else instBadge = `<span class="badge" style="cursor:pointer; background:#e2ecd7; color:#406048;" onclick="event.stopPropagation(); openConvertInstModal('${x.id}')">🔄 เปลี่ยนเป็นผ่อน</span>`;
       let changeOwnerBtn = `<span class="badge" style="cursor:pointer; background:#e8f0fe; color:#1a73e8;" onclick="event.stopPropagation(); openChangeOwnerModal('${x.id}')">👤 ${esc(x.owner)} ✏️</span>`;
 
@@ -988,6 +998,14 @@ function render(){
       let dueDayNum = getChannelDue(m);
       let [bYear, bMonth] = k.split("-").map(Number);
       let dueLabelText = `ครบกำหนดจ่าย ${pad(dueDayNum)}/${pad(bMonth)}/${bYear + 543}`;
+
+      if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
+        let matchedS = x.installmentPlan.schedules.find(s => s.dueDate && s.dueDate.substring(0, 7) === k);
+        if (matchedS && matchedS.dueDate) {
+          let [sY, sM, sD] = matchedS.dueDate.split("-").map(Number);
+          dueLabelText = `ครบกำหนดจ่าย ${pad(sD)}/${pad(sM)}/${sY + 543}`;
+        }
+      }
 
       if (isCashType) {
         rightSideStatus = `<p class="c-green" style="font-size:10.5px; opacity: 0.9;">จ่ายเงินสด/โอน ✓</p>`;
@@ -1051,7 +1069,7 @@ function filterVisualReport() {
   entries.forEach(x => { 
     let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
-      x.installmentPlan.schedules.forEach(s => { if (keyFromDateForBillingCycle(s.dueDate, m) === k) { flatList.push({ sortDate: s.dueDate, date: s.dueDate, item: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`, owner: x.owner, method: x.method, category: x.category, amount: Number(s.amount) }); } });
+      x.installmentPlan.schedules.forEach(s => { if (s.dueDate && s.dueDate.substring(0, 7) === k) { flatList.push({ sortDate: s.dueDate, date: s.dueDate, item: `${x.item} (งวดที่ ${s.no}/${x.installmentPlan.months})`, owner: x.owner, method: x.method, category: x.category, amount: Number(s.amount) }); } });
     } else {
       if (keyFromDateForBillingCycle(x.date, m) === k) { let eff = getEffectiveItemData(x, k); flatList.push({ sortDate: x.date, date: x.date, item: x.item, owner: x.owner, method: x.method, category: x.category, amount: Number(eff.amount) }); }
     }
@@ -1069,7 +1087,7 @@ function exportToCSV() {
     let m = x.method || "CreditCard";
     if (x.isInstallment && x.installmentPlan && x.installmentPlan.schedules) {
       x.installmentPlan.schedules.forEach(s => { 
-        if (keyFromDateForBillingCycle(s.dueDate, m) === k) {
+        if (s.dueDate && s.dueDate.substring(0, 7) === k) {
           let principal = Number(x.amount) || 0; let totalToPay = Number(x.installmentPlan.totalToPay) || 0; let totalInterest = Math.max(0, totalToPay - principal);
           let annualInterest = Number(x.installmentPlan.annualInterest) || 0; if (annualInterest === 0 && totalInterest > 0 && principal > 0 && x.installmentPlan.months > 0) { annualInterest = (totalInterest / principal) * (12 / x.installmentPlan.months) * 100; }
           let instText = ` [ผ่อน ${x.installmentPlan.months} งวด (ยอดเต็ม ฿${money(totalToPay)}), ดอกเบี้ย ${annualInterest.toFixed(2)}% ต่อปี, ดอกเบี้ยรวม ฿${money(totalInterest)}]`;
