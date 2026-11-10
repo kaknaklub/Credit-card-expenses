@@ -121,12 +121,18 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
       <label>รูปแบบการชำระ</label>
       <div class="radio-segments">
         <label><input type="radio" name="payType" value="normal" checked onchange="togglePayType()"><span>จ่ายครั้งเดียว</span></label>
-        <label><input type="radio" name="payType" value="installment" onchange="togglePayType()"><span>ผ่อนชำระ (เช่น 3, 6, 10 งวด)</span></label>
+        <label><input type="radio" name="payType" value="installment" onchange="togglePayType()"><span>ผ่อนชำระ</span></label>
       </div>
     </div>
 
+    <!-- กล่องเลือกจำนวนงวดแบบกดเลือก (ไม่ต้องพิมพ์) -->
     <div id="installmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:14px;">
-      <div class="input-group"><label>จำนวนงวดทั้งหมด (เดือน)</label><input id="installMonths" type="number" value="3" min="2" max="36"></div>
+      <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-main);">เลือกจำนวนงวดผ่อนชำระ</label>
+      <div class="radio-segments">
+        <label><input type="radio" name="installMonths" value="3" checked><span>3 เดือน</span></label>
+        <label><input type="radio" name="installMonths" value="6"><span>6 เดือน</span></label>
+        <label><input type="radio" name="installMonths" value="10"><span>10 เดือน</span></label>
+      </div>
     </div>
 
     <button class="btn-main" onclick="addEntry()">บันทึกรายการ</button>
@@ -136,7 +142,7 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
   <nav class="bottom-nav">
     <div class="nav-item active" id="navHome" onclick="switchView('home')">🏠<span>หน้าแรก</span></div>
     <div class="nav-fab" onclick="switchView('add')">+</div>
-    <div class="nav-item" id="navStats" onclick="alert('เวอร์ชัน V1: เน้นการจับคู่และเช็กยอดคำสั่งซื้อครับ')">📊<span>สถิติ</span></div>
+    <div class="nav-item" id="navStats" onclick="alert('เวอร์ชัน V1.1: ปรับปรุงปุ่มเลือกงวดผ่อนให้ใช้งานง่ายขึ้นครับ')">📊<span>สถิติ</span></div>
   </nav>
 </div>
 
@@ -194,7 +200,7 @@ function addEntry() {
   }
 
   if(isInst) {
-    const months = Number(document.getElementById("installMonths").value) || 3;
+    const months = Number(document.querySelector('input[name="installMonths"]:checked').value);
     const perMonth = amount / months;
     let [y, m, d] = date.split('-').map(Number);
 
