@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Shopee & Credit Card Matcher Pro</title>
+<title>Shopee & Credit Card Matcher Pro V2</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 :root { 
@@ -39,7 +39,8 @@ body { margin: 0; background: var(--bg); color: var(--text-main); line-height: 1
 
 .entry-card { background: var(--surface-white); border-radius: 18px; padding: 14px; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; gap: 12px; align-items: center; cursor: pointer; transition: transform 0.1s; }
 .entry-card:active { transform: scale(0.98); }
-.entry-icon { width: 44px; height: 44px; border-radius: 14px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); }
+.entry-icon { width: 46px; height: 46px; border-radius: 14px; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light); overflow: hidden; }
+.entry-icon img { width: 100%; height: 100%; object-fit: cover; }
 .entry-details { flex: 1; overflow: hidden; }
 .entry-details h4 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .entry-details p { margin: 0; font-size: 11px; color: var(--text-muted); }
@@ -58,6 +59,8 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
 .radio-segments input[type="radio"] { display: none; }
 .radio-segments input[type="radio"]:checked + span { background: var(--primary); color: #fff; border-radius: 10px; display: block; padding: 8px; margin: -8px; box-shadow: 0 3px 8px rgba(126,168,138,0.4); }
 
+.ai-banner { background: #f4f0e8; border: 1px dashed #c8b088; color: #785c30; border-radius: 16px; padding: 14px; margin-bottom: 16px; text-align: center; font-size: 13px; cursor: pointer; }
+
 .btn-main { width: 100%; padding: 15px; border: none; border-radius: 16px; background: var(--primary); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; box-shadow: 5px 5px 14px rgba(126,168,138,0.4); }
 .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 440px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border-radius: 28px; display: flex; justify-content: space-around; align-items: center; padding: 6px 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); z-index: 50; }
 .nav-item { display: flex; flex-direction: column; align-items: center; gap: 2px; color: #a0b2a7; cursor: pointer; padding: 6px 14px; font-size: 18px; }
@@ -70,6 +73,8 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
 .sheet { background: var(--surface-white); width: 100%; max-width: 480px; border-radius: 32px 32px 0 0; padding: 22px 22px 36px; box-shadow: 0 -10px 40px rgba(0,0,0,0.05); max-height: 85vh; overflow-y: auto; }
 .grabber { width: 36px; height: 4px; background: var(--shadow-dark); border-radius: 3px; margin: 0 auto 18px; }
 .hidden { display: none !important; }
+#imgViewerModal .sheet { background: transparent; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; box-shadow: none; border-radius: 0; }
+#imgViewerModal img { max-width: 90vw; max-height: 90vh; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
 </style>
 </head>
 <body>
@@ -78,7 +83,7 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
   <div id="view-home">
     <div class="header-top">
       <div><p>Shopee & Card Matcher Pro</p><h1>จัดการยอดช้อปปิ้ง</h1></div>
-      <button onclick="clearAllData()" style="background:var(--bg); border:none; border-radius:12px; padding:8px 12px; font-size:11px; color:var(--danger); cursor:pointer;">รีเซ็ตข้อมูล</button>
+      <button onclick="clearAllData()" style="background:var(--bg); border:none; border-radius:12px; padding:8px 12px; font-size:11px; color:var(--danger); cursor:pointer;">รีเซ็ต</button>
     </div>
 
     <div class="balance-card">
@@ -103,9 +108,19 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
   <div id="view-add" class="hidden">
     <div class="header-top"><div><p>New Purchase</p><h1>เพิ่มรายการซื้อใหม่</h1></div></div>
     
+    <!-- AI JSON Import Banner -->
+    <div class="ai-banner" onclick="document.getElementById('jsonImportBox').classList.toggle('hidden')">
+      ✨ <strong>วางข้อมูล JSON จาก AI (กรอกอัตโนมัติ)</strong><br>
+      <span style="font-size:11.5px; opacity:0.8;">แตะเพื่อเปิดช่องวางโค้ดดึงข้อมูลไม่ต้องพิมพ์เอง</span>
+    </div>
+    <div id="jsonImportBox" class="hidden" style="margin-bottom: 16px; background: var(--surface-white); padding: 14px; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+      <textarea id="jsonImportData" rows="5" style="width: 100%; border-radius: 12px; padding: 10px; border: 1px solid var(--shadow-dark); font-size:12px; font-family:monospace;" placeholder='วาง JSON เช่น {"date":"2026-06-01","item":"เสื้อผ้า","amount":450,"method":"SPayLater"}'></textarea>
+      <button class="btn-main" style="margin-top: 8px; padding: 10px; font-size: 13px;" onclick="importJSON()">⬇️ ดึงข้อมูลเข้าฟอร์ม</button>
+    </div>
+
     <div class="input-group"><label>วันที่ซื้อ</label><input id="date" type="date"></div>
     <div class="input-group"><label>ชื่อสินค้า / ร้านค้าบน Shopee</label><input id="item" type="text" placeholder="เช่น เสื้อผ้าแฟชั่น, เก้าอี้เกมมิ่ง..."></div>
-    <div class="input-group"><label>หมายเลขคำสั่งซื้อ (Order ID / เลขพัสดุ)</label><input id="orderNo" type="text" placeholder="เช่น SHOPEE-260515XYZ"></div>
+    <div class="input-group"><label>หมายเลขคำสั่งซื้อ (Order ID)</label><input id="orderNo" type="text" placeholder="เช่น SHOPEE-260515XYZ"></div>
     <div class="input-group"><label>ยอดเงิน (บาท)</label><input id="amount" type="number" step="0.01" placeholder="0.00"></div>
     
     <div class="input-group">
@@ -125,7 +140,6 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
       </div>
     </div>
 
-    <!-- กล่องเลือกจำนวนงวดแบบกดเลือก (ไม่ต้องพิมพ์) -->
     <div id="installmentBox" class="hidden" style="background:var(--bg); padding:14px; border-radius:16px; margin-bottom:14px;">
       <label style="display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--text-main);">เลือกจำนวนงวดผ่อนชำระ</label>
       <div class="radio-segments">
@@ -135,6 +149,11 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
       </div>
     </div>
 
+    <div class="input-group">
+      <label>📷 แนบรูปภาพสินค้า / สลิป (ถ้ามี)</label>
+      <input id="entryImg" type="file" accept="image/*">
+    </div>
+
     <button class="btn-main" onclick="addEntry()">บันทึกรายการ</button>
   </div>
 
@@ -142,7 +161,7 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
   <nav class="bottom-nav">
     <div class="nav-item active" id="navHome" onclick="switchView('home')">🏠<span>หน้าแรก</span></div>
     <div class="nav-fab" onclick="switchView('add')">+</div>
-    <div class="nav-item" id="navStats" onclick="alert('เวอร์ชัน V1.1: ปรับปรุงปุ่มเลือกงวดผ่อนให้ใช้งานง่ายขึ้นครับ')">📊<span>สถิติ</span></div>
+    <div class="nav-item" id="navStats" onclick="alert('เวอร์ชัน V2: รองรับแนบรูปภาพและนำเข้า JSON อัตโนมัติแล้วครับ')">📊<span>สถิติ</span></div>
   </nav>
 </div>
 
@@ -151,18 +170,24 @@ input, select, textarea { width: 100%; padding: 12px 14px; border: none; border-
   <div class="sheet">
     <div class="grabber"></div>
     <h3 style="margin:0 0 10px; font-size:18px;">รายละเอียดคำสั่งซื้อ</h3>
+    <div id="modalImgContainer" style="text-align:center; margin-bottom:12px;"></div>
     <div id="modalContent" style="font-size:13.5px; margin-bottom:20px; line-height:1.6;"></div>
     <button class="btn-main" id="modalActionBtn" onclick="toggleStatusFromModal()">เปลี่ยนสถานะ (จ่ายแล้ว/รอจ่าย)</button>
   </div>
 </div>
 
+<!-- IMAGE VIEWER MODAL -->
+<div class="modal" id="imgViewerModal" onclick="closeImgViewer()">
+  <div class="sheet"><img id="fullViewImg" src=""></div>
+</div>
+
 <script>
-let entries = JSON.parse(localStorage.getItem('shopee_matcher_entries') || '[]');
+let entries = JSON.parse(localStorage.getItem('shopee_matcher_entries_v2') || '[]');
 let currentFilter = 'all';
 let selectedId = null;
 
 function saveToLocalStorage() {
-  localStorage.setItem('shopee_matcher_entries', JSON.stringify(entries));
+  localStorage.setItem('shopee_matcher_entries_v2', JSON.stringify(entries));
 }
 
 function switchView(view) {
@@ -186,7 +211,56 @@ function togglePayType() {
   document.getElementById('installmentBox').classList.toggle('hidden', !isInst);
 }
 
-function addEntry() {
+function compressImage(file) {
+  return new Promise((resolve) => {
+    if(!file) return resolve(null);
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (e) => {
+      const img = new Image();
+      img.src = e.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX = 400;
+        const scale = img.width > MAX ? (MAX / img.width) : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      }
+    }
+  });
+}
+
+function viewImage(src) {
+  if(!src) return;
+  document.getElementById('fullViewImg').src = src;
+  document.getElementById('imgViewerModal').classList.add('open');
+}
+function closeImgViewer() {
+  document.getElementById('imgViewerModal').classList.remove('open');
+}
+
+function importJSON() {
+  try {
+    const raw = document.getElementById('jsonImportData').value.trim();
+    if(!raw) return alert("กรุณาวางโค้ด JSON ก่อนครับ");
+    const data = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+    if(data.date) document.getElementById('date').value = data.date;
+    if(data.item) document.getElementById('item').value = data.item;
+    if(data.orderNo) document.getElementById('orderNo').value = data.orderNo;
+    if(data.amount) document.getElementById('amount').value = data.amount;
+    if(data.method) document.getElementById('method').value = data.method;
+    alert("✅ นำเข้าข้อมูลเข้าฟอร์มสำเร็จ!");
+    document.getElementById('jsonImportData').value = "";
+    document.getElementById('jsonImportBox').classList.add('hidden');
+  } catch(err) {
+    alert("❌ รูปแบบ JSON ไม่ถูกต้อง");
+  }
+}
+
+async function addEntry() {
   const date = document.getElementById("date").value;
   const item = document.getElementById("item").value.trim();
   const orderNo = document.getElementById("orderNo").value.trim();
@@ -198,6 +272,9 @@ function addEntry() {
     alert("กรุณากรอกข้อมูล วันที่, ชื่อสินค้า และยอดเงินให้ครบถ้วนครับ");
     return;
   }
+
+  const fileInput = document.getElementById("entryImg").files[0];
+  const b64Img = await compressImage(fileInput);
 
   if(isInst) {
     const months = Number(document.querySelector('input[name="installMonths"]:checked').value);
@@ -215,6 +292,7 @@ function addEntry() {
         orderNo: orderNo || '-',
         amount: Number(perMonth.toFixed(2)),
         method: method,
+        image: b64Img,
         paid: false
       });
     }
@@ -226,6 +304,7 @@ function addEntry() {
       orderNo: orderNo || '-',
       amount,
       method,
+      image: b64Img,
       paid: false
     });
   }
@@ -234,6 +313,7 @@ function addEntry() {
   document.getElementById("item").value = "";
   document.getElementById("orderNo").value = "";
   document.getElementById("amount").value = "";
+  document.getElementById("entryImg").value = "";
   switchView('home');
 }
 
@@ -247,6 +327,9 @@ function openModal(id) {
   const e = entries.find(x => x.id === id);
   if(!e) return;
   
+  let imgHtml = e.image ? `<div style="text-align:center; margin-bottom:12px;"><img src="${e.image}" style="max-height:160px; border-radius:12px; object-fit:cover; cursor:pointer;" onclick="viewImage('${e.image}')" title="แตะเพื่อดูภาพใหญ่"></div>` : '';
+  document.getElementById("modalImgContainer").innerHTML = imgHtml;
+
   document.getElementById("modalContent").innerHTML = `
     <b>สินค้า:</b> ${e.item}<br>
     <b>Order ID:</b> ${e.orderNo}<br>
@@ -304,9 +387,11 @@ function render() {
   if(filtered.length === 0) {
     html = `<div style="text-align:center; padding:40px; color:var(--text-muted);">ไม่มีรายการคำสั่งซื้อในขณะนี้ 🛒</div>`;
   } else {
-    html = filtered.map(x => `
+    html = filtered.map(x => {
+      let iconContent = x.image ? `<img src="${x.image}">` : '📦';
+      return `
       <div class="entry-card" onclick="openModal('${x.id}')">
-        <div class="entry-icon">📦</div>
+        <div class="entry-icon">${iconContent}</div>
         <div class="entry-details">
           <h4>${x.item}</h4>
           <p>Order: ${x.orderNo} • ${x.date}</p>
@@ -320,7 +405,7 @@ function render() {
           ${x.paid ? '<p class="c-green">จ่ายแล้ว ✓</p>' : '<p class="c-red">รอชำระ</p>'}
         </div>
       </div>
-    `).join("");
+    `;}).join("");
   }
   document.getElementById("entriesList").innerHTML = html;
 }
